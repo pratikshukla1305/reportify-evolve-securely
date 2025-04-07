@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -18,12 +17,6 @@ import { Label } from '@/components/ui/label';
 import { getKycVerifications, updateKycVerificationStatus } from '@/services/officerServices';
 import { KycVerification } from '@/types/officer';
 
-interface KycDocumentType {
-  id: string;
-  document_type: string;
-  document_url: string;
-}
-
 interface KycVerificationListProps {
   limit?: number;
 }
@@ -34,7 +27,6 @@ const KycVerificationList = ({ limit }: KycVerificationListProps) => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('details');
   const [isLoading, setIsLoading] = useState(true);
-  const [documents, setDocuments] = useState<KycDocumentType[]>([]);
   const { toast } = useToast();
 
   const fetchVerifications = async () => {
@@ -54,37 +46,12 @@ const KycVerificationList = ({ limit }: KycVerificationListProps) => {
     }
   };
 
-  // Simulate document fetching without using the new table directly
-  const simulateDocumentFetch = (verification: KycVerification) => {
-    // Create mock document data from the verification data
-    const mockDocuments: KycDocumentType[] = [];
-    
-    if (verification.id_front) {
-      mockDocuments.push({
-        id: `front-${verification.id}`,
-        document_type: 'id_front',
-        document_url: verification.id_front
-      });
-    }
-    
-    if (verification.id_back) {
-      mockDocuments.push({
-        id: `back-${verification.id}`,
-        document_type: 'id_back',
-        document_url: verification.id_back
-      });
-    }
-    
-    setDocuments(mockDocuments);
-  };
-
   useEffect(() => {
     fetchVerifications();
   }, [limit]);
 
   const handleView = async (verification: KycVerification) => {
     setSelectedVerification(verification);
-    simulateDocumentFetch(verification);
     setIsDialogOpen(true);
     setActiveTab('details');
   };
@@ -290,54 +257,35 @@ const KycVerificationList = ({ limit }: KycVerificationListProps) => {
                   <div className="bg-gray-50 p-4 rounded-md">
                     <h3 className="text-sm font-medium text-gray-500 mb-4">ID Documents</h3>
                     
-                    {documents.length > 0 ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {documents.map((doc) => (
-                          <div key={doc.id} className="border rounded-md overflow-hidden">
-                            <div className="bg-gray-100 p-2 flex justify-between items-center">
-                              <span className="font-medium capitalize text-sm">
-                                {doc.document_type === 'id_front' ? 'ID Front' : 'ID Back'}
-                              </span>
-                            </div>
-                            <img 
-                              src={doc.document_url} 
-                              alt={doc.document_type === 'id_front' ? 'ID Front' : 'ID Back'}
-                              className="w-full h-auto max-h-64 object-contain p-2"
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center py-8">
-                        {selectedVerification.id_front && (
-                          <div className="w-full max-w-md">
-                            <h3 className="text-sm font-medium text-gray-500 mb-2">ID Front</h3>
-                            <img 
-                              src={selectedVerification.id_front} 
-                              alt="ID Front" 
-                              className="w-full h-auto rounded-md"
-                            />
-                          </div>
-                        )}
-                        
-                        {selectedVerification.id_back && (
-                          <div className="w-full max-w-md mt-4">
-                            <h3 className="text-sm font-medium text-gray-500 mb-2">ID Back</h3>
-                            <img 
-                              src={selectedVerification.id_back} 
-                              alt="ID Back" 
-                              className="w-full h-auto rounded-md"
-                            />
-                          </div>
-                        )}
-                        
-                        {!selectedVerification.id_front && !selectedVerification.id_back && (
-                          <div className="text-center py-12">
-                            <p className="text-gray-500">No ID documents available</p>
-                          </div>
-                        )}
-                      </div>
-                    )}
+                    <div className="w-full">
+                      {selectedVerification.id_front && (
+                        <div className="w-full max-w-md mb-6">
+                          <h3 className="text-sm font-medium text-gray-500 mb-2">ID Front</h3>
+                          <img 
+                            src={selectedVerification.id_front} 
+                            alt="ID Front" 
+                            className="w-full h-auto rounded-md border"
+                          />
+                        </div>
+                      )}
+                      
+                      {selectedVerification.id_back && (
+                        <div className="w-full max-w-md">
+                          <h3 className="text-sm font-medium text-gray-500 mb-2">ID Back</h3>
+                          <img 
+                            src={selectedVerification.id_back} 
+                            alt="ID Back" 
+                            className="w-full h-auto rounded-md border"
+                          />
+                        </div>
+                      )}
+                      
+                      {!selectedVerification.id_front && !selectedVerification.id_back && (
+                        <div className="text-center py-12">
+                          <p className="text-gray-500">No ID documents available</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </TabsContent>
@@ -350,7 +298,7 @@ const KycVerificationList = ({ limit }: KycVerificationListProps) => {
                       <img 
                         src={selectedVerification.selfie} 
                         alt="User Selfie" 
-                        className="max-w-full max-h-96 object-contain rounded-md"
+                        className="max-w-full max-h-96 object-contain rounded-md border"
                       />
                     ) : (
                       <div className="text-center py-12">

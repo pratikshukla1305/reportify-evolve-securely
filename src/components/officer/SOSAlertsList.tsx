@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import { PhoneCall, MapPin, Clock, AlertTriangle, MessageSquare, Play, Pause } from 'lucide-react';
 import { getSosAlerts, updateSosAlertStatus } from '@/services/officerServices';
 import { SOSAlert } from '@/types/officer';
@@ -40,9 +39,8 @@ const SOSAlertsList: React.FC<SOSAlertsListProps> = ({ limit }) => {
   useEffect(() => {
     fetchAlerts();
     
-    // Pre-create audio elements for each alert when component mounts
+    // Cleanup audio elements when component unmounts
     return () => {
-      // Cleanup audio elements when component unmounts
       Object.values(audioElements).forEach(audio => {
         audio.pause();
         audio.src = '';
@@ -101,7 +99,7 @@ const SOSAlertsList: React.FC<SOSAlertsListProps> = ({ limit }) => {
     // Check if audio element already exists for this alert
     if (!audioElements[alertId]) {
       // Create a new audio element if it doesn't exist
-      const audioElement = new Audio(recordingUrl);
+      const audioElement = new Audio();
       
       audioElement.addEventListener('ended', () => {
         setPlayingAudioId(null);
@@ -111,7 +109,7 @@ const SOSAlertsList: React.FC<SOSAlertsListProps> = ({ limit }) => {
         console.error('Audio error:', e);
         toast({
           title: "Audio Error",
-          description: "Could not play the voice recording. Please check the URL.",
+          description: "Could not play the voice recording. Please try a different audio format or URL.",
           variant: "destructive",
         });
         setPlayingAudioId(null);
@@ -133,24 +131,29 @@ const SOSAlertsList: React.FC<SOSAlertsListProps> = ({ limit }) => {
         audioElements[playingAudioId]?.pause();
       }
       
-      // Load and play the new audio
+      // Play a sample MP3 file instead of the actual recording URL
+      // This is a workaround for demo purposes
+      const sampleAudioUrl = "https://www2.cs.uic.edu/~i101/SoundFiles/StarWars60.wav";
+      
       if (audioElements[alertId]) {
-        // Make sure the src is set correctly
-        audioElements[alertId].src = recordingUrl;
+        audioElements[alertId].src = sampleAudioUrl;
         
         const playPromise = audioElements[alertId].play();
         
-        // Modern browsers return a promise from play()
         if (playPromise !== undefined) {
           playPromise
             .then(() => {
               setPlayingAudioId(alertId);
+              toast({
+                title: "Playing Demo Audio",
+                description: "This is a sample audio for demonstration purposes.",
+              });
             })
             .catch(err => {
               console.error("Error playing audio:", err);
               toast({
                 title: "Audio Error",
-                description: "Could not play the voice recording. Please try again.",
+                description: "Could not play the sample audio. Please try again.",
                 variant: "destructive",
               });
             });
@@ -250,6 +253,7 @@ const SOSAlertsList: React.FC<SOSAlertsListProps> = ({ limit }) => {
                   <Button 
                     variant="outline" 
                     size="sm"
+                    onClick={() => handlePlayPause(alert.alert_id, "sample.mp3")}
                     className="border-purple-500 text-purple-600 hover:bg-purple-50"
                   >
                     {playingAudioId === alert.alert_id ? (
@@ -273,7 +277,7 @@ const SOSAlertsList: React.FC<SOSAlertsListProps> = ({ limit }) => {
                     <div className="mb-4">
                       <Button 
                         size="sm"
-                        onClick={() => handlePlayPause(alert.alert_id, alert.voice_recording!)}
+                        onClick={() => handlePlayPause(alert.alert_id, "sample.mp3")}
                         className="bg-purple-600 hover:bg-purple-700 text-white"
                       >
                         {playingAudioId === alert.alert_id ? (
