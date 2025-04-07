@@ -12,10 +12,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from '@/hooks/use-toast';
-import MapComponent from '@/components/maps/MapComponent';
 import { Input } from '@/components/ui/input';
 import { caseDensityData } from '@/data/caseDensityData';
 import { useNavigate } from 'react-router-dom';
+import StaticMap from '@/components/maps/StaticMap';
 
 const caseTypes = [
   { id: "all", name: "All Cases" },
@@ -56,11 +56,6 @@ const CaseHeatmap = () => {
     
     return () => clearTimeout(timer);
   }, []);
-
-  const handleMapClick = () => {
-    // This redirects to the full map view with cases
-    navigate('/case-density-map');
-  };
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -159,19 +154,13 @@ const CaseHeatmap = () => {
             </div>
           ) : (
             isMapView ? (
-              <div className="h-[600px] rounded-lg overflow-hidden bg-gray-100 border relative cursor-pointer" onClick={handleMapClick}>
-                <img 
-                  src="/lovable-uploads/3f2bac0b-2cf4-41fa-83d0-9da0d44ca7c5.png" 
-                  alt="Case Density Map" 
-                  className="w-full h-full object-cover"
+              <div className="h-[600px] rounded-lg overflow-hidden">
+                <StaticMap
+                  altText="Case Density Map"
+                  redirectPath="/case-density-map"
+                  buttonText="View Interactive Case Map"
+                  description="Click to see detailed case heat map"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent flex flex-col items-center justify-end p-6">
-                  <MapPin className="h-10 w-10 text-white mb-2" />
-                  <Button className="bg-shield-blue hover:bg-blue-700">
-                    View Interactive Case Map
-                  </Button>
-                  <p className="text-white text-sm mt-2">Click to see detailed case heat map</p>
-                </div>
               </div>
             ) : (
               <div className="bg-white rounded-lg shadow p-6">

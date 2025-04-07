@@ -272,6 +272,41 @@ export type Database = {
           },
         ]
       }
+      kyc_documents: {
+        Row: {
+          created_at: string | null
+          document_type: string
+          document_url: string
+          extracted_data: Json | null
+          id: string
+          verification_id: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          document_type: string
+          document_url: string
+          extracted_data?: Json | null
+          id?: string
+          verification_id?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          document_type?: string
+          document_url?: string
+          extracted_data?: Json | null
+          id?: string
+          verification_id?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kyc_documents_verification_id_fkey"
+            columns: ["verification_id"]
+            isOneToOne: false
+            referencedRelation: "kyc_verifications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       kyc_verifications: {
         Row: {
           created_at: string | null
@@ -419,6 +454,7 @@ export type Database = {
           latitude: number | null
           location: string
           longitude: number | null
+          map_redirect_url: string | null
           message: string | null
           reported_by: string
           reported_time: string
@@ -435,6 +471,7 @@ export type Database = {
           latitude?: number | null
           location: string
           longitude?: number | null
+          map_redirect_url?: string | null
           message?: string | null
           reported_by: string
           reported_time: string
@@ -451,6 +488,7 @@ export type Database = {
           latitude?: number | null
           location?: string
           longitude?: number | null
+          map_redirect_url?: string | null
           message?: string | null
           reported_by?: string
           reported_time?: string
@@ -459,6 +497,35 @@ export type Database = {
           voice_recording?: string | null
         }
         Relationships: []
+      }
+      voice_recordings: {
+        Row: {
+          alert_id: string | null
+          created_at: string | null
+          id: string
+          recording_url: string
+        }
+        Insert: {
+          alert_id?: string | null
+          created_at?: string | null
+          id?: string
+          recording_url: string
+        }
+        Update: {
+          alert_id?: string | null
+          created_at?: string | null
+          id?: string
+          recording_url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voice_recordings_alert_id_fkey"
+            columns: ["alert_id"]
+            isOneToOne: false
+            referencedRelation: "sos_alerts"
+            referencedColumns: ["alert_id"]
+          },
+        ]
       }
     }
     Views: {

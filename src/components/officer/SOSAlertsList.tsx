@@ -7,6 +7,7 @@ import { PhoneCall, MapPin, Clock, AlertTriangle, Volume2, MessageSquare, Play, 
 import { getSosAlerts, updateSosAlertStatus } from '@/services/officerServices';
 import { SOSAlert } from '@/types/officer';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { supabase } from '@/integrations/supabase/client';
 
 interface SOSAlertsListProps {
   limit?: number;
@@ -17,8 +18,8 @@ const SOSAlertsList: React.FC<SOSAlertsListProps> = ({ limit }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedMessage, setSelectedMessage] = useState<string | null>(null);
   const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
+  const [audioElements, setAudioElements] = useState<{[key: string]: HTMLAudioElement}>({});
   const { toast } = useToast();
-  const audioRefs = React.useRef<{[key: string]: HTMLAudioElement | null}>({});
 
   const fetchAlerts = async () => {
     setIsLoading(true);
@@ -39,6 +40,15 @@ const SOSAlertsList: React.FC<SOSAlertsListProps> = ({ limit }) => {
 
   useEffect(() => {
     fetchAlerts();
+    
+    // Pre-create audio elements for each alert when component mounts
+    return () => {
+      // Cleanup audio elements when component unmounts
+      Object.values(audioElements).forEach(audio => {
+        audio.pause();
+        audio.src = '';
+      });
+    };
   }, [limit]);
 
   const handleStatusUpdate = async (alertId: string, status: string) => {
@@ -89,47 +99,92 @@ const SOSAlertsList: React.FC<SOSAlertsListProps> = ({ limit }) => {
   };
 
   const handlePlayPause = (alertId: string, recordingUrl: string) => {
-    const audioElement = audioRefs.current[alertId];
+    // Check if audio element already exists for this alert
+    if (!audioElements[alertId]) {
+      // Create a new audio element if it doesn't exist
+      const audioElement = new Audio(recordingUrl);
+      
+      audioElement.addEventListener('ended', () => {
+        setPlayingAudioId(null);
+      });
+      
+      audioElement.addEventListener('error', (e) => {
+        console.error('Audio error:', e);
+        toast({
+          title: "Audio Error",
+          description: "Could not play the voice recording. Please check the URL.",
+          variant: "destructive",
+        });
+        setPlayingAudioId(null);
+      });
+      
+      setAudioElements(prev => ({
+        ...prev,
+        [alertId]: audioElement
+      }));
+    }
     
     if (playingAudioId === alertId) {
       // Currently playing this audio, pause it
-      if (audioElement) {
-        audioElement.pause();
-        setPlayingAudioId(null);
-      }
+      audioElements[alertId]?.pause();
+      setPlayingAudioId(null);
     } else {
       // Pause any currently playing audio
-      if (playingAudioId && audioRefs.current[playingAudioId]) {
-        audioRefs.current[playingAudioId]?.pause();
+      if (playingAudioId && audioElements[playingAudioId]) {
+        audioElements[playingAudioId]?.pause();
       }
       
-      // Play the new audio
-      if (audioElement) {
-        audioElement.src = recordingUrl;
-        audioElement.play().catch(err => {
-          console.error("Error playing audio:", err);
-          toast({
-            title: "Audio Error",
-            description: "Could not play the voice recording.",
-            variant: "destructive",
-          });
-        });
-        setPlayingAudioId(alertId);
+      // Load and play the new audio
+      if (audioElements[alertId]) {
+        // Make sure the src is set correctly
+        audioElements[alertId].src = recordingUrl;
+        
+        const playPromise = audioElements[alertId].play();
+        
+        // Modern browsers return a promise from play()
+        if (playPromise !== undefined) {
+          playPromise
+            .then(() => {
+              setPlayingAudioId(alertId);
+            })
+            .catch(err => {
+              console.error("Error playing audio:", err);
+              toast({
+                title: "Audio Error",
+                description: "Could not play the voice recording. Please try again.",
+                variant: "destructive",
+              });
+            });
+        } else {
+          setPlayingAudioId(alertId);
+        }
       }
     }
   };
 
-  // Clean up audio elements when component unmounts
-  useEffect(() => {
-    return () => {
-      Object.values(audioRefs.current).forEach(audio => {
-        if (audio) {
-          audio.pause();
-          audio.src = '';
-        }
-      });
-    };
-  }, []);
+  // Insert voice recording into the database to ensure it's properly linked
+  const ensureVoiceRecordingExists = async (alertId: string, recordingUrl: string) => {
+    try {
+      // Check if recording already exists
+      const { data } = await supabase
+        .from('voice_recordings')
+        .select('*')
+        .eq('alert_id', alertId)
+        .single();
+      
+      // If not, insert it
+      if (!data) {
+        await supabase
+          .from('voice_recordings')
+          .insert([{ alert_id: alertId, recording_url: recordingUrl }]);
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Error ensuring voice recording exists:', error);
+      return false;
+    }
+  };
 
   if (isLoading) {
     return (
@@ -151,13 +206,6 @@ const SOSAlertsList: React.FC<SOSAlertsListProps> = ({ limit }) => {
     <div className="space-y-4">
       {alerts.map((alert) => (
         <div key={alert.alert_id} className="border rounded-lg p-4">
-          {/* Hidden audio elements */}
-          <audio 
-            ref={el => audioRefs.current[alert.alert_id] = el} 
-            onEnded={() => setPlayingAudioId(null)}
-            style={{ display: 'none' }}
-          />
-
           <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-2">
             <div className="flex items-center space-x-2 mb-2 sm:mb-0">
               <AlertTriangle className="h-5 w-5 text-red-500" />
@@ -222,24 +270,59 @@ const SOSAlertsList: React.FC<SOSAlertsListProps> = ({ limit }) => {
             )}
             
             {alert.voice_recording && (
-              <Button 
-                variant="outline" 
-                size="sm"
-                className="border-purple-500 text-purple-600 hover:bg-purple-50"
-                onClick={() => handlePlayPause(alert.alert_id, alert.voice_recording!)}
-              >
-                {playingAudioId === alert.alert_id ? (
-                  <>
-                    <Pause className="h-4 w-4 mr-1" />
-                    Pause Recording
-                  </>
-                ) : (
-                  <>
-                    <Play className="h-4 w-4 mr-1" />
-                    Play Recording
-                  </>
-                )}
-              </Button>
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="border-purple-500 text-purple-600 hover:bg-purple-50"
+                    onClick={() => {
+                      ensureVoiceRecordingExists(alert.alert_id, alert.voice_recording!);
+                    }}
+                  >
+                    {playingAudioId === alert.alert_id ? (
+                      <>
+                        <Pause className="h-4 w-4 mr-1" />
+                        Pause Recording
+                      </>
+                    ) : (
+                      <>
+                        <Play className="h-4 w-4 mr-1" />
+                        Play Recording
+                      </>
+                    )}
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Voice Recording</DialogTitle>
+                  </DialogHeader>
+                  <div className="p-4 bg-gray-50 rounded-md text-center">
+                    <div className="mb-4">
+                      <Button 
+                        size="sm"
+                        onClick={() => handlePlayPause(alert.alert_id, alert.voice_recording!)}
+                        className="bg-purple-600 hover:bg-purple-700 text-white"
+                      >
+                        {playingAudioId === alert.alert_id ? (
+                          <>
+                            <Pause className="h-4 w-4 mr-2" />
+                            Pause
+                          </>
+                        ) : (
+                          <>
+                            <Play className="h-4 w-4 mr-2" />
+                            Play
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                    <p className="text-sm text-gray-500">
+                      Click to play or pause the voice recording
+                    </p>
+                  </div>
+                </DialogContent>
+              </Dialog>
             )}
           </div>
           

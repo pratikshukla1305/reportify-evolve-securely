@@ -1,8 +1,9 @@
+
 import React, { useState, useEffect } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Check, X, Eye } from 'lucide-react';
+import { Check, X, Eye, Loader2 } from 'lucide-react';
 import { 
   Dialog, 
   DialogContent, 
@@ -16,6 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 import { getKycVerifications, updateKycVerificationStatus } from '@/services/officerServices';
 import { KycVerification } from '@/types/officer';
+import { supabase } from '@/integrations/supabase/client';
 
 interface KycVerificationListProps {
   limit?: number;
@@ -27,6 +29,7 @@ const KycVerificationList = ({ limit }: KycVerificationListProps) => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('details');
   const [isLoading, setIsLoading] = useState(true);
+  const [documents, setDocuments] = useState<any[]>([]);
   const { toast } = useToast();
 
   const fetchVerifications = async () => {
@@ -46,12 +49,27 @@ const KycVerificationList = ({ limit }: KycVerificationListProps) => {
     }
   };
 
+  const fetchDocuments = async (verificationId: number) => {
+    try {
+      const { data, error } = await supabase
+        .from('kyc_documents')
+        .select('*')
+        .eq('verification_id', verificationId);
+        
+      if (error) throw error;
+      setDocuments(data || []);
+    } catch (error: any) {
+      console.error('Error fetching documents:', error.message);
+    }
+  };
+
   useEffect(() => {
     fetchVerifications();
   }, [limit]);
 
-  const handleView = (verification: KycVerification) => {
+  const handleView = async (verification: KycVerification) => {
     setSelectedVerification(verification);
+    await fetchDocuments(verification.id);
     setIsDialogOpen(true);
     setActiveTab('details');
   };
@@ -254,82 +272,107 @@ const KycVerificationList = ({ limit }: KycVerificationListProps) => {
               
               <TabsContent value="documents" className="py-2">
                 <div className="space-y-4">
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500 mb-2">ID Front</h3>
-                    <div className="border rounded-md overflow-hidden">
-                      {selectedVerification.id_front ? (
-                        <img 
-                          src={selectedVerification.id_front} 
-                          alt="ID Front" 
-                          className="w-full h-auto"
-                        />
-                      ) : (
-                        <div className="p-4 text-center text-gray-500">No ID front image available</div>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500 mb-2">ID Back</h3>
-                    <div className="border rounded-md overflow-hidden">
-                      {selectedVerification.id_back ? (
-                        <img 
-                          src={selectedVerification.id_back} 
-                          alt="ID Back" 
-                          className="w-full h-auto"
-                        />
-                      ) : (
-                        <div className="p-4 text-center text-gray-500">No ID back image available</div>
-                      )}
-                    </div>
+                  <div className="bg-gray-50 p-4 rounded-md">
+                    <h3 className="text-sm font-medium text-gray-500 mb-4">ID Documents</h3>
+                    
+                    {documents.length > 0 ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {documents.map((doc) => (
+                          <div key={doc.id} className="border rounded-md overflow-hidden">
+                            <div className="bg-gray-100 p-2 flex justify-between items-center">
+                              <span className="font-medium capitalize text-sm">
+                                {doc.document_type}
+                              </span>
+                            </div>
+                            <img 
+                              src={doc.document_url} 
+                              alt={doc.document_type}
+                              className="w-full h-auto max-h-64 object-contain p-2"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-8">
+                        {selectedVerification.id_front && (
+                          <div className="w-full max-w-md">
+                            <h3 className="text-sm font-medium text-gray-500 mb-2">ID Front</h3>
+                            <img 
+                              src={selectedVerification.id_front} 
+                              alt="ID Front" 
+                              className="w-full h-auto rounded-md"
+                            />
+                          </div>
+                        )}
+                        
+                        {selectedVerification.id_back && (
+                          <div className="w-full max-w-md mt-4">
+                            <h3 className="text-sm font-medium text-gray-500 mb-2">ID Back</h3>
+                            <img 
+                              src={selectedVerification.id_back} 
+                              alt="ID Back" 
+                              className="w-full h-auto rounded-md"
+                            />
+                          </div>
+                        )}
+                        
+                        {!selectedVerification.id_front && !selectedVerification.id_back && (
+                          <div className="text-center py-12">
+                            <p className="text-gray-500">No ID documents available</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </TabsContent>
               
               <TabsContent value="selfie" className="py-2">
-                <div>
-                  <h3 className="text-sm font-medium text-gray-500 mb-2">User Selfie</h3>
-                  <div className="border rounded-md overflow-hidden flex justify-center">
+                <div className="space-y-4">
+                  <h3 className="text-sm font-medium text-gray-500 mb-2">Selfie Photo</h3>
+                  <div className="flex justify-center">
                     {selectedVerification.selfie ? (
                       <img 
                         src={selectedVerification.selfie} 
                         alt="User Selfie" 
-                        className="max-h-80"
+                        className="max-w-full max-h-96 object-contain rounded-md"
                       />
                     ) : (
-                      <div className="p-4 text-center text-gray-500">No selfie available</div>
+                      <div className="text-center py-12">
+                        <Avatar className="w-32 h-32 mx-auto">
+                          <AvatarFallback className="text-4xl">{selectedVerification.full_name.charAt(0)}</AvatarFallback>
+                        </Avatar>
+                        <p className="text-gray-500 mt-4">No selfie available</p>
+                      </div>
                     )}
                   </div>
                 </div>
               </TabsContent>
             </Tabs>
             
-            <DialogFooter className="gap-2 mt-4">
+            <DialogFooter className="flex justify-between mt-6">
+              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                Close
+              </Button>
+              
               {selectedVerification.status.toLowerCase() === 'pending' && (
-                <>
-                  <Button
-                    variant="outline"
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                <div className="flex space-x-2">
+                  <Button 
+                    variant="outline" 
+                    className="flex items-center text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
                     onClick={() => handleReject(selectedVerification.id)}
                   >
                     <X className="h-4 w-4 mr-1" />
-                    Reject Verification
+                    Reject
                   </Button>
-                  <Button
-                    className="bg-green-600 hover:bg-green-700"
+                  <Button 
+                    className="flex items-center bg-green-600 hover:bg-green-700 text-white"
                     onClick={() => handleApprove(selectedVerification.id)}
                   >
                     <Check className="h-4 w-4 mr-1" />
-                    Approve Verification
+                    Approve
                   </Button>
-                </>
-              )}
-              {selectedVerification.status.toLowerCase() !== 'pending' && (
-                <Button
-                  onClick={() => setIsDialogOpen(false)}
-                >
-                  Close
-                </Button>
+                </div>
               )}
             </DialogFooter>
           </DialogContent>
