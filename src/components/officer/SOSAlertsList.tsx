@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
-import { PhoneCall, MapPin, Clock, AlertTriangle, Volume2, MessageSquare } from 'lucide-react';
+import { PhoneCall, MapPin, Clock, AlertTriangle, Volume2, MessageSquare, Play, Pause } from 'lucide-react';
 import { getSosAlerts, updateSosAlertStatus } from '@/services/officerServices';
 import { SOSAlert } from '@/types/officer';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -16,7 +16,9 @@ const SOSAlertsList: React.FC<SOSAlertsListProps> = ({ limit }) => {
   const [alerts, setAlerts] = useState<SOSAlert[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedMessage, setSelectedMessage] = useState<string | null>(null);
+  const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
   const { toast } = useToast();
+  const audioRefs = React.useRef<{[key: string]: HTMLAudioElement | null}>({});
 
   const fetchAlerts = async () => {
     setIsLoading(true);
@@ -86,6 +88,49 @@ const SOSAlertsList: React.FC<SOSAlertsListProps> = ({ limit }) => {
     }
   };
 
+  const handlePlayPause = (alertId: string, recordingUrl: string) => {
+    const audioElement = audioRefs.current[alertId];
+    
+    if (playingAudioId === alertId) {
+      // Currently playing this audio, pause it
+      if (audioElement) {
+        audioElement.pause();
+        setPlayingAudioId(null);
+      }
+    } else {
+      // Pause any currently playing audio
+      if (playingAudioId && audioRefs.current[playingAudioId]) {
+        audioRefs.current[playingAudioId]?.pause();
+      }
+      
+      // Play the new audio
+      if (audioElement) {
+        audioElement.src = recordingUrl;
+        audioElement.play().catch(err => {
+          console.error("Error playing audio:", err);
+          toast({
+            title: "Audio Error",
+            description: "Could not play the voice recording.",
+            variant: "destructive",
+          });
+        });
+        setPlayingAudioId(alertId);
+      }
+    }
+  };
+
+  // Clean up audio elements when component unmounts
+  useEffect(() => {
+    return () => {
+      Object.values(audioRefs.current).forEach(audio => {
+        if (audio) {
+          audio.pause();
+          audio.src = '';
+        }
+      });
+    };
+  }, []);
+
   if (isLoading) {
     return (
       <div className="flex justify-center py-8">
@@ -106,6 +151,13 @@ const SOSAlertsList: React.FC<SOSAlertsListProps> = ({ limit }) => {
     <div className="space-y-4">
       {alerts.map((alert) => (
         <div key={alert.alert_id} className="border rounded-lg p-4">
+          {/* Hidden audio elements */}
+          <audio 
+            ref={el => audioRefs.current[alert.alert_id] = el} 
+            onEnded={() => setPlayingAudioId(null)}
+            style={{ display: 'none' }}
+          />
+
           <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-2">
             <div className="flex items-center space-x-2 mb-2 sm:mb-0">
               <AlertTriangle className="h-5 w-5 text-red-500" />
@@ -174,12 +226,19 @@ const SOSAlertsList: React.FC<SOSAlertsListProps> = ({ limit }) => {
                 variant="outline" 
                 size="sm"
                 className="border-purple-500 text-purple-600 hover:bg-purple-50"
+                onClick={() => handlePlayPause(alert.alert_id, alert.voice_recording!)}
               >
-                <Volume2 className="h-4 w-4 mr-1" />
-                <audio controls className="h-6 w-32">
-                  <source src={alert.voice_recording} type="audio/mpeg" />
-                  Your browser does not support the audio element.
-                </audio>
+                {playingAudioId === alert.alert_id ? (
+                  <>
+                    <Pause className="h-4 w-4 mr-1" />
+                    Pause Recording
+                  </>
+                ) : (
+                  <>
+                    <Play className="h-4 w-4 mr-1" />
+                    Play Recording
+                  </>
+                )}
               </Button>
             )}
           </div>
