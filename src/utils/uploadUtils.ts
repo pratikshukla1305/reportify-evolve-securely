@@ -176,23 +176,13 @@ export const uploadCriminalPhoto = async (
   try {
     const fileExt = photoFile.name.split('.').pop() || 'jpg';
     const fileName = `criminal-${Date.now()}.${fileExt}`;
-    const filePath = `criminal-photos/${fileName}`;
+    const filePath = `${fileName}`;
     
-    // Check if evidence bucket exists and create if needed
-    const { data: buckets } = await supabase.storage.listBuckets();
-    const evidenceBucketExists = buckets?.some(bucket => bucket.name === 'evidence');
+    console.log(`Uploading criminal photo: ${filePath}, size: ${photoFile.size} bytes`);
     
-    if (!evidenceBucketExists) {
-      await supabase.storage.createBucket('evidence', {
-        public: true,
-      });
-    }
-    
-    console.log(`Uploading file: ${filePath}, size: ${photoFile.size} bytes`);
-    
-    // Upload photo
+    // Upload photo to the criminal-photos bucket (which we created in SQL)
     const { error, data } = await supabase.storage
-      .from('evidence')
+      .from('criminal-photos')
       .upload(filePath, photoFile, {
         cacheControl: '3600',
         upsert: true
@@ -203,14 +193,14 @@ export const uploadCriminalPhoto = async (
       throw error;
     }
     
-    console.log('File uploaded successfully:', data?.path);
+    console.log('Criminal photo uploaded successfully:', data?.path);
     
     // Get public URL
     const { data: urlData } = supabase.storage
-      .from('evidence')
+      .from('criminal-photos')
       .getPublicUrl(filePath);
       
-    console.log('Generated public URL:', urlData.publicUrl);
+    console.log('Generated public criminal photo URL:', urlData.publicUrl);
     
     return urlData.publicUrl;
   } catch (error: any) {

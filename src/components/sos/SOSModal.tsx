@@ -149,7 +149,7 @@ const SOSModal = ({ open, onOpenChange, userLocation }: SOSModalProps) => {
         console.log("Voice recording uploaded to:", voiceUrl);
       }
       
-      // Create SOS alert in database
+      // Create SOS alert in database with fixed schema (using TEXT types instead of VARCHAR)
       const { error } = await supabase
         .from('sos_alerts')
         .insert({
