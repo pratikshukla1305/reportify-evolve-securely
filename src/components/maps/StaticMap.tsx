@@ -22,7 +22,12 @@ const StaticMap: React.FC<StaticMapProps> = ({
   const navigate = useNavigate();
   
   const handleMapClick = () => {
-    navigate(redirectPath);
+    // For Google Maps redirection
+    if (redirectPath.startsWith('http')) {
+      window.open(redirectPath, '_blank');
+    } else {
+      navigate(redirectPath);
+    }
   };
   
   return (

@@ -12,9 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from '@/hooks/use-toast';
-import { Input } from '@/components/ui/input';
 import { caseDensityData } from '@/data/caseDensityData';
-import { useNavigate } from 'react-router-dom';
 import StaticMap from '@/components/maps/StaticMap';
 
 const caseTypes = [
@@ -34,8 +32,6 @@ const timeRanges = [
 ];
 
 const CaseHeatmap = () => {
-  const navigate = useNavigate();
-  const [mapCenter, setMapCenter] = useState({ lat: 13.082680, lng: 80.270718 }); // Chennai
   const [loading, setLoading] = useState(true);
   const [selectedCaseType, setSelectedCaseType] = useState("all");
   const [selectedTimeRange, setSelectedTimeRange] = useState("all");
@@ -48,6 +44,13 @@ const CaseHeatmap = () => {
 
   const totalCases = filteredCaseData.reduce((sum, item) => sum + item.count, 0);
   const highestDensityArea = [...filteredCaseData].sort((a, b) => b.count - a.count)[0]?.region || "N/A";
+
+  // Create Google Maps URL for the highest density region
+  const getGoogleMapsUrl = () => {
+    // Default to Chennai if no data
+    const region = highestDensityArea !== "N/A" ? highestDensityArea : "Chennai";
+    return `https://www.google.com/maps/search/${encodeURIComponent(region)}`;
+  };
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -73,7 +76,7 @@ const CaseHeatmap = () => {
               <Button 
                 variant={isMapView ? "default" : "outline"} 
                 onClick={() => setIsMapView(true)}
-                className="bg-shield-blue text-white"
+                className={isMapView ? "bg-shield-blue text-white" : ""}
               >
                 <MapPin className="h-4 w-4 mr-2" />
                 Map View
@@ -157,7 +160,7 @@ const CaseHeatmap = () => {
               <div className="h-[600px] rounded-lg overflow-hidden">
                 <StaticMap
                   altText="Case Density Map"
-                  redirectPath="/case-density-map"
+                  redirectPath={getGoogleMapsUrl()}
                   buttonText="View Interactive Case Map"
                   description="Click to see detailed case heat map"
                 />

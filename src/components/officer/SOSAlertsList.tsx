@@ -3,11 +3,10 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
-import { PhoneCall, MapPin, Clock, AlertTriangle, Volume2, MessageSquare, Play, Pause } from 'lucide-react';
+import { PhoneCall, MapPin, Clock, AlertTriangle, MessageSquare, Play, Pause } from 'lucide-react';
 import { getSosAlerts, updateSosAlertStatus } from '@/services/officerServices';
 import { SOSAlert } from '@/types/officer';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { supabase } from '@/integrations/supabase/client';
 
 interface SOSAlertsListProps {
   limit?: number;
@@ -162,30 +161,6 @@ const SOSAlertsList: React.FC<SOSAlertsListProps> = ({ limit }) => {
     }
   };
 
-  // Insert voice recording into the database to ensure it's properly linked
-  const ensureVoiceRecordingExists = async (alertId: string, recordingUrl: string) => {
-    try {
-      // Check if recording already exists
-      const { data } = await supabase
-        .from('voice_recordings')
-        .select('*')
-        .eq('alert_id', alertId)
-        .single();
-      
-      // If not, insert it
-      if (!data) {
-        await supabase
-          .from('voice_recordings')
-          .insert([{ alert_id: alertId, recording_url: recordingUrl }]);
-      }
-      
-      return true;
-    } catch (error) {
-      console.error('Error ensuring voice recording exists:', error);
-      return false;
-    }
-  };
-
   if (isLoading) {
     return (
       <div className="flex justify-center py-8">
@@ -276,9 +251,6 @@ const SOSAlertsList: React.FC<SOSAlertsListProps> = ({ limit }) => {
                     variant="outline" 
                     size="sm"
                     className="border-purple-500 text-purple-600 hover:bg-purple-50"
-                    onClick={() => {
-                      ensureVoiceRecordingExists(alert.alert_id, alert.voice_recording!);
-                    }}
                   >
                     {playingAudioId === alert.alert_id ? (
                       <>
