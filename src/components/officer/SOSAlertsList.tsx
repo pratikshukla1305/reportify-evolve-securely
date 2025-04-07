@@ -17,6 +17,7 @@ const SOSAlertsList: React.FC<SOSAlertsListProps> = ({ limit }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedMessage, setSelectedMessage] = useState<string | null>(null);
   const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
+  const [audioLoaded, setAudioLoaded] = useState<{[key: string]: boolean}>({});
   const { toast } = useToast();
   const audioRefs = React.useRef<{[key: string]: HTMLAudioElement | null}>({});
 
@@ -88,33 +89,83 @@ const SOSAlertsList: React.FC<SOSAlertsListProps> = ({ limit }) => {
     }
   };
 
-  const handlePlayPause = (alertId: string, recordingUrl: string) => {
-    const audioElement = audioRefs.current[alertId];
-    
-    if (playingAudioId === alertId) {
-      // Currently playing this audio, pause it
-      if (audioElement) {
-        audioElement.pause();
-        setPlayingAudioId(null);
-      }
-    } else {
-      // Pause any currently playing audio
-      if (playingAudioId && audioRefs.current[playingAudioId]) {
-        audioRefs.current[playingAudioId]?.pause();
-      }
+  const preloadAudio = (alertId: string, recordingUrl: string) => {
+    if (!audioRefs.current[alertId]) {
+      audioRefs.current[alertId] = new Audio(recordingUrl);
       
-      // Play the new audio
-      if (audioElement) {
-        audioElement.src = recordingUrl;
-        audioElement.play().catch(err => {
-          console.error("Error playing audio:", err);
+      // Set up event listeners
+      if (audioRefs.current[alertId]) {
+        const audio = audioRefs.current[alertId];
+        
+        audio.addEventListener('canplaythrough', () => {
+          setAudioLoaded(prev => ({ ...prev, [alertId]: true }));
+        });
+        
+        audio.addEventListener('ended', () => {
+          setPlayingAudioId(null);
+        });
+        
+        audio.addEventListener('error', (e) => {
+          console.error("Audio loading error:", e);
           toast({
             title: "Audio Error",
-            description: "Could not play the voice recording.",
+            description: "Could not load the voice recording.",
             variant: "destructive",
           });
+          setAudioLoaded(prev => ({ ...prev, [alertId]: false }));
         });
-        setPlayingAudioId(alertId);
+        
+        // Start preloading
+        audio.load();
+      }
+    }
+  };
+
+  const handlePlayPause = (alertId: string, recordingUrl: string) => {
+    // If there's already a playing audio, pause it first
+    if (playingAudioId && playingAudioId !== alertId && audioRefs.current[playingAudioId]) {
+      audioRefs.current[playingAudioId]?.pause();
+    }
+    
+    // Get or create the audio element for this alert
+    if (!audioRefs.current[alertId]) {
+      preloadAudio(alertId, recordingUrl);
+    }
+    
+    const audioElement = audioRefs.current[alertId];
+    
+    if (!audioElement) {
+      toast({
+        title: "Audio Error",
+        description: "Could not initialize the audio player.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Play or pause based on current state
+    if (playingAudioId === alertId) {
+      // Currently playing this audio, pause it
+      audioElement.pause();
+      setPlayingAudioId(null);
+    } else {
+      // Play this audio
+      audioElement.currentTime = 0; // Reset to start
+      const playPromise = audioElement.play();
+      
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            setPlayingAudioId(alertId);
+          })
+          .catch(err => {
+            console.error("Error playing audio:", err);
+            toast({
+              title: "Audio Error",
+              description: "Could not play the voice recording. Please try again.",
+              variant: "destructive",
+            });
+          });
       }
     }
   };
@@ -126,10 +177,20 @@ const SOSAlertsList: React.FC<SOSAlertsListProps> = ({ limit }) => {
         if (audio) {
           audio.pause();
           audio.src = '';
+          audio.load();
         }
       });
     };
   }, []);
+
+  // Preload audio for all alerts with voice_recording
+  useEffect(() => {
+    alerts.forEach(alert => {
+      if (alert.voice_recording) {
+        preloadAudio(alert.alert_id, alert.voice_recording);
+      }
+    });
+  }, [alerts]);
 
   if (isLoading) {
     return (
@@ -151,13 +212,6 @@ const SOSAlertsList: React.FC<SOSAlertsListProps> = ({ limit }) => {
     <div className="space-y-4">
       {alerts.map((alert) => (
         <div key={alert.alert_id} className="border rounded-lg p-4">
-          {/* Hidden audio elements */}
-          <audio 
-            ref={el => audioRefs.current[alert.alert_id] = el} 
-            onEnded={() => setPlayingAudioId(null)}
-            style={{ display: 'none' }}
-          />
-
           <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-2">
             <div className="flex items-center space-x-2 mb-2 sm:mb-0">
               <AlertTriangle className="h-5 w-5 text-red-500" />
@@ -225,7 +279,11 @@ const SOSAlertsList: React.FC<SOSAlertsListProps> = ({ limit }) => {
               <Button 
                 variant="outline" 
                 size="sm"
-                className="border-purple-500 text-purple-600 hover:bg-purple-50"
+                className={`${
+                  playingAudioId === alert.alert_id 
+                    ? "border-red-500 text-red-600 hover:bg-red-50" 
+                    : "border-purple-500 text-purple-600 hover:bg-purple-50"
+                }`}
                 onClick={() => handlePlayPause(alert.alert_id, alert.voice_recording!)}
               >
                 {playingAudioId === alert.alert_id ? (

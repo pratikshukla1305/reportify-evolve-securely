@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -12,7 +11,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from '@/hooks/use-toast';
-import MapComponent from '@/components/maps/MapComponent';
 import { Input } from '@/components/ui/input';
 import { caseDensityData } from '@/data/caseDensityData';
 import { useNavigate } from 'react-router-dom';
@@ -36,7 +34,7 @@ const timeRanges = [
 const CaseHeatmap = () => {
   const navigate = useNavigate();
   const [mapCenter, setMapCenter] = useState({ lat: 13.082680, lng: 80.270718 }); // Chennai
-  const [loading, setLoading] = useState(true);
+  const [loading, setIsLoading] = useState(true);
   const [selectedCaseType, setSelectedCaseType] = useState("all");
   const [selectedTimeRange, setSelectedTimeRange] = useState("all");
   const [isMapView, setIsMapView] = useState(true);
@@ -51,15 +49,15 @@ const CaseHeatmap = () => {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      setLoading(false);
+      setIsLoading(false);
     }, 1500);
     
     return () => clearTimeout(timer);
   }, []);
 
   const handleMapClick = () => {
-    // This redirects to the full map view with cases
-    navigate('/case-density-map');
+    // Redirects to officer dashboard map tab
+    navigate('/officer-dashboard?tab=map');
   };
 
   return (
