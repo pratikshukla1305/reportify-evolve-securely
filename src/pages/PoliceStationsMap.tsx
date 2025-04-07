@@ -18,8 +18,6 @@ const PoliceStationsMap = () => {
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [mapboxToken, setMapboxToken] = useState<string | null>(null);
-  const [tokenInputVisible, setTokenInputVisible] = useState(false);
   const [sosModalOpen, setSOSModalOpen] = useState(false);
 
   // Filter police stations based on search query
@@ -63,30 +61,10 @@ const PoliceStationsMap = () => {
         variant: "destructive"
       });
     }
-
-    // Check if a default token is available
-    if (window.DEFAULT_MAPBOX_TOKEN) {
-      toast({
-        title: "Using default Mapbox token",
-        description: "A default Mapbox token is being used. You can set your own token if needed.",
-      });
-    }
   }, []);
 
   const handleStationClick = (stationId: string) => {
     navigate(`/police-station/${stationId}`);
-  };
-
-  const handleMapboxTokenSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (mapboxToken) {
-      localStorage.setItem('mapbox_token', mapboxToken);
-      setTokenInputVisible(false);
-      toast({
-        title: "Mapbox token saved",
-        description: "Your Mapbox token has been saved for this session.",
-      });
-    }
   };
 
   const handleSOSClick = () => {
@@ -138,61 +116,17 @@ const PoliceStationsMap = () => {
                 Find and connect with police stations in your vicinity
               </p>
             </div>
-            <div className="flex space-x-4">
-              <div className="relative w-full md:w-64">
-                <Input
-                  type="text"
-                  placeholder="Search police stations..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-                <MapPin className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-              </div>
-              <Button 
-                variant="outline"
-                onClick={() => setTokenInputVisible(true)}
-                className="whitespace-nowrap"
-              >
-                Set Mapbox Token
-              </Button>
+            <div className="relative w-full md:w-64">
+              <Input
+                type="text"
+                placeholder="Search police stations..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+              <MapPin className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
             </div>
           </div>
-
-          {tokenInputVisible && (
-            <div className="bg-gray-50 p-4 rounded-lg mb-6">
-              <form onSubmit={handleMapboxTokenSubmit} className="flex flex-col space-y-2">
-                <p className="text-sm text-gray-600">
-                  Please enter your Mapbox public token to enable the map. You can get one from{" "}
-                  <a 
-                    href="https://account.mapbox.com/access-tokens/" 
-                    target="_blank" 
-                    rel="noreferrer" 
-                    className="text-blue-600 hover:underline"
-                  >
-                    Mapbox
-                  </a>
-                </p>
-                <div className="flex space-x-2">
-                  <Input
-                    type="text"
-                    placeholder="pk.eyJ1Ijo..."
-                    value={mapboxToken || ''}
-                    onChange={(e) => setMapboxToken(e.target.value)}
-                    className="flex-1"
-                  />
-                  <Button type="submit">Save Token</Button>
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={() => setTokenInputVisible(false)}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </form>
-            </div>
-          )}
 
           {loading ? (
             <div className="h-96 flex items-center justify-center bg-gray-50 rounded-lg">

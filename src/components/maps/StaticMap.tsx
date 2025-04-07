@@ -19,7 +19,7 @@ const StaticMap: React.FC<StaticMapProps> = ({ altText = "Map of police stations
   return (
     <div className={`relative cursor-pointer rounded-lg overflow-hidden ${className || ''}`}>
       <img 
-        src="/police-map.jpg" 
+        src="/lovable-uploads/3f2bac0b-2cf4-41fa-83d0-9da0d44ca7c5.png" 
         alt={altText}
         className="w-full h-auto object-cover"
         onClick={handleMapClick}

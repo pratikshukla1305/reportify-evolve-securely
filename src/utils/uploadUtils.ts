@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { v4 as uuidv4 } from 'uuid';
 import { toast } from 'sonner';
@@ -180,7 +181,7 @@ export const uploadCriminalPhoto = async (
     
     console.log(`Uploading criminal photo: ${filePath}, size: ${photoFile.size} bytes`);
     
-    // Upload photo to the criminal-photos bucket (which we created in SQL)
+    // Upload photo to the criminal-photos bucket
     const { error, data } = await supabase.storage
       .from('criminal-photos')
       .upload(filePath, photoFile, {

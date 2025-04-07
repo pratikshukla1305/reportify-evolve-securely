@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
@@ -16,8 +17,6 @@ const PoliceStationDetail = () => {
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [distance, setDistance] = useState<number | null>(null);
   const [timeToReach, setTimeToReach] = useState<string | null>(null);
-  const [mapboxToken, setMapboxToken] = useState<string | null>(null);
-  const [tokenInputVisible, setTokenInputVisible] = useState(false);
 
   useEffect(() => {
     // Find the station by ID
@@ -60,14 +59,6 @@ const PoliceStationDetail = () => {
       );
     }
     
-    // Check if a default token is available
-    if (window.DEFAULT_MAPBOX_TOKEN) {
-      toast({
-        title: "Using default Mapbox token",
-        description: "A default Mapbox token is being used. You can set your own token if needed.",
-      });
-    }
-    
     setLoading(false);
   }, [id]);
 
@@ -82,18 +73,6 @@ const PoliceStationDetail = () => {
       title: "Video Call Feature",
       description: "This feature would initiate a video call with the police station.",
     });
-  };
-
-  const handleMapboxTokenSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (mapboxToken) {
-      localStorage.setItem('mapbox_token', mapboxToken);
-      setTokenInputVisible(false);
-      toast({
-        title: "Mapbox token saved",
-        description: "Your Mapbox token has been saved for this session.",
-      });
-    }
   };
 
   if (loading) {
@@ -188,58 +167,13 @@ const PoliceStationDetail = () => {
               </div>
               
               <div className="bg-white rounded-lg shadow-md overflow-hidden p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl font-semibold text-shield-dark">Location</h2>
-                  <Button 
-                    variant="outline"
-                    onClick={() => setTokenInputVisible(true)}
-                    size="sm"
-                  >
-                    Set Mapbox Token
-                  </Button>
-                </div>
-                
-                {tokenInputVisible && (
-                  <div className="bg-gray-50 p-4 rounded-lg mb-4">
-                    <form onSubmit={handleMapboxTokenSubmit} className="flex flex-col space-y-2">
-                      <p className="text-sm text-gray-600">
-                        Please enter your Mapbox public token to enable the map. You can get one from{" "}
-                        <a 
-                          href="https://account.mapbox.com/access-tokens/" 
-                          target="_blank" 
-                          rel="noreferrer" 
-                          className="text-blue-600 hover:underline"
-                        >
-                          Mapbox
-                        </a>
-                      </p>
-                      <div className="flex space-x-2">
-                        <input
-                          type="text"
-                          placeholder="pk.eyJ1Ijo..."
-                          value={mapboxToken || ''}
-                          onChange={(e) => setMapboxToken(e.target.value)}
-                          className="flex-1 px-3 py-2 border rounded"
-                        />
-                        <Button type="submit">Save Token</Button>
-                        <Button 
-                          type="button" 
-                          variant="outline" 
-                          onClick={() => setTokenInputVisible(false)}
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                    </form>
-                  </div>
-                )}
+                <h2 className="text-xl font-semibold text-shield-dark mb-4">Location</h2>
                 
                 <div className="h-[400px] rounded-lg overflow-hidden bg-gray-100 border">
-                  <MapComponent 
-                    userLocation={userLocation || station.coordinates}
-                    policeStations={[station]}
-                    centerOnStation={true}
-                    zoom={14}
+                  <img 
+                    src="/lovable-uploads/3f2bac0b-2cf4-41fa-83d0-9da0d44ca7c5.png" 
+                    alt="Station Location Map" 
+                    className="w-full h-full object-cover"
                   />
                 </div>
                 

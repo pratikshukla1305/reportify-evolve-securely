@@ -1,10 +1,12 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
-import { PhoneCall, MapPin, Clock, AlertTriangle } from 'lucide-react';
+import { PhoneCall, MapPin, Clock, AlertTriangle, Volume2, MessageSquare } from 'lucide-react';
 import { getSosAlerts, updateSosAlertStatus } from '@/services/officerServices';
 import { SOSAlert } from '@/types/officer';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 interface SOSAlertsListProps {
   limit?: number;
@@ -13,6 +15,7 @@ interface SOSAlertsListProps {
 const SOSAlertsList: React.FC<SOSAlertsListProps> = ({ limit }) => {
   const [alerts, setAlerts] = useState<SOSAlert[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedMessage, setSelectedMessage] = useState<string | null>(null);
   const { toast } = useToast();
 
   const fetchAlerts = async () => {
@@ -141,12 +144,45 @@ const SOSAlertsList: React.FC<SOSAlertsListProps> = ({ limit }) => {
             )}
           </div>
           
-          {alert.message && (
-            <div className="mb-3 p-3 bg-gray-50 rounded-md">
-              <div className="font-medium mb-1">Message</div>
-              <div className="text-gray-700">{alert.message}</div>
-            </div>
-          )}
+          <div className="flex flex-wrap gap-2 mb-3">
+            {alert.message && (
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="border-blue-500 text-blue-600 hover:bg-blue-50"
+                    onClick={() => setSelectedMessage(alert.message)}
+                  >
+                    <MessageSquare className="h-4 w-4 mr-1" />
+                    View Message
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>SOS Message</DialogTitle>
+                  </DialogHeader>
+                  <div className="p-4 bg-gray-50 rounded-md max-h-96 overflow-y-auto">
+                    <p className="whitespace-pre-wrap">{alert.message}</p>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            )}
+            
+            {alert.voice_recording && (
+              <Button 
+                variant="outline" 
+                size="sm"
+                className="border-purple-500 text-purple-600 hover:bg-purple-50"
+              >
+                <Volume2 className="h-4 w-4 mr-1" />
+                <audio controls className="h-6 w-32">
+                  <source src={alert.voice_recording} type="audio/mpeg" />
+                  Your browser does not support the audio element.
+                </audio>
+              </Button>
+            )}
+          </div>
           
           <div className="flex flex-wrap gap-2 mt-4">
             {alert.status !== "In Progress" && (

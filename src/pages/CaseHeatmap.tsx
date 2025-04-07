@@ -15,6 +15,7 @@ import { toast } from '@/hooks/use-toast';
 import MapComponent from '@/components/maps/MapComponent';
 import { Input } from '@/components/ui/input';
 import { caseDensityData } from '@/data/caseDensityData';
+import { useNavigate } from 'react-router-dom';
 
 const caseTypes = [
   { id: "all", name: "All Cases" },
@@ -33,12 +34,11 @@ const timeRanges = [
 ];
 
 const CaseHeatmap = () => {
+  const navigate = useNavigate();
   const [mapCenter, setMapCenter] = useState({ lat: 13.082680, lng: 80.270718 }); // Chennai
   const [loading, setLoading] = useState(true);
   const [selectedCaseType, setSelectedCaseType] = useState("all");
   const [selectedTimeRange, setSelectedTimeRange] = useState("all");
-  const [mapboxToken, setMapboxToken] = useState<string | null>(null);
-  const [tokenInputVisible, setTokenInputVisible] = useState(false);
   const [isMapView, setIsMapView] = useState(true);
 
   const filteredCaseData = caseDensityData.filter(item => {
@@ -47,7 +47,6 @@ const CaseHeatmap = () => {
   });
 
   const totalCases = filteredCaseData.reduce((sum, item) => sum + item.count, 0);
-  // Fix this line to handle location object correctly
   const highestDensityArea = [...filteredCaseData].sort((a, b) => b.count - a.count)[0]?.region || "N/A";
 
   useEffect(() => {
@@ -55,26 +54,12 @@ const CaseHeatmap = () => {
       setLoading(false);
     }, 1500);
     
-    if (window.DEFAULT_MAPBOX_TOKEN) {
-      toast({
-        title: "Using default Mapbox token",
-        description: "A default Mapbox token is being used. You can set your own token if needed.",
-      });
-    }
-    
     return () => clearTimeout(timer);
   }, []);
 
-  const handleMapboxTokenSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (mapboxToken) {
-      localStorage.setItem('mapbox_token', mapboxToken);
-      setTokenInputVisible(false);
-      toast({
-        title: "Mapbox token saved",
-        description: "Your Mapbox token has been saved for this session.",
-      });
-    }
+  const handleMapClick = () => {
+    // This redirects to the full map view with cases
+    navigate('/case-density-map');
   };
 
   return (
@@ -106,49 +91,8 @@ const CaseHeatmap = () => {
                 <BarChart className="h-4 w-4 mr-2" />
                 Statistics View
               </Button>
-              <Button 
-                variant="outline"
-                onClick={() => setTokenInputVisible(true)}
-              >
-                Set Mapbox Token
-              </Button>
             </div>
           </div>
-
-          {tokenInputVisible && (
-            <div className="bg-gray-50 p-4 rounded-lg mb-6">
-              <form onSubmit={handleMapboxTokenSubmit} className="flex flex-col space-y-2">
-                <p className="text-sm text-gray-600">
-                  Please enter your Mapbox public token to enable the map. You can get one from{" "}
-                  <a 
-                    href="https://account.mapbox.com/access-tokens/" 
-                    target="_blank" 
-                    rel="noreferrer" 
-                    className="text-blue-600 hover:underline"
-                  >
-                    Mapbox
-                  </a>
-                </p>
-                <div className="flex space-x-2">
-                  <Input
-                    type="text"
-                    placeholder="pk.eyJ1Ijo..."
-                    value={mapboxToken || ''}
-                    onChange={(e) => setMapboxToken(e.target.value)}
-                    className="flex-1"
-                  />
-                  <Button type="submit">Save Token</Button>
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={() => setTokenInputVisible(false)}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </form>
-            </div>
-          )}
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
             <div className="bg-white shadow rounded-lg p-4 flex flex-col justify-between">
@@ -215,12 +159,19 @@ const CaseHeatmap = () => {
             </div>
           ) : (
             isMapView ? (
-              <div className="h-[600px] rounded-lg overflow-hidden bg-gray-100 border">
-                <MapComponent 
-                  userLocation={mapCenter}
-                  isHeatmap={true}
-                  heatmapData={filteredCaseData}
+              <div className="h-[600px] rounded-lg overflow-hidden bg-gray-100 border relative cursor-pointer" onClick={handleMapClick}>
+                <img 
+                  src="/lovable-uploads/3f2bac0b-2cf4-41fa-83d0-9da0d44ca7c5.png" 
+                  alt="Case Density Map" 
+                  className="w-full h-full object-cover"
                 />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent flex flex-col items-center justify-end p-6">
+                  <MapPin className="h-10 w-10 text-white mb-2" />
+                  <Button className="bg-shield-blue hover:bg-blue-700">
+                    View Interactive Case Map
+                  </Button>
+                  <p className="text-white text-sm mt-2">Click to see detailed case heat map</p>
+                </div>
               </div>
             ) : (
               <div className="bg-white rounded-lg shadow p-6">
@@ -262,4 +213,3 @@ const CaseHeatmap = () => {
 };
 
 export default CaseHeatmap;
-

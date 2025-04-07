@@ -17,14 +17,9 @@ const ImageMap = () => {
       <CardContent className="p-0 relative">
         <div className="aspect-video bg-gray-200 flex items-center justify-center">
           <img 
-            src="/police-map.jpg" 
+            src="/lovable-uploads/3f2bac0b-2cf4-41fa-83d0-9da0d44ca7c5.png" 
             alt="Police Stations Map" 
             className="w-full h-full object-cover"
-            onError={(e) => {
-              const target = e.target as HTMLImageElement;
-              target.src = '/placeholder.svg';
-              target.style.padding = '2rem';
-            }}
           />
         </div>
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30">
