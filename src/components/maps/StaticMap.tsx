@@ -7,20 +7,13 @@ import { MapPin } from 'lucide-react';
 interface StaticMapProps {
   altText?: string;
   className?: string;
-  redirectTo?: string;
-  buttonText?: string;
 }
 
-const StaticMap: React.FC<StaticMapProps> = ({ 
-  altText = "Map of police stations", 
-  className,
-  redirectTo = '/police-stations',
-  buttonText = "Locate Police Stations"
-}) => {
+const StaticMap: React.FC<StaticMapProps> = ({ altText = "Map of police stations", className }) => {
   const navigate = useNavigate();
   
   const handleMapClick = () => {
-    navigate(redirectTo);
+    navigate('/police-stations');
   };
   
   return (
@@ -37,7 +30,7 @@ const StaticMap: React.FC<StaticMapProps> = ({
       >
         <MapPin className="h-10 w-10 text-white mb-2" />
         <Button className="bg-shield-blue hover:bg-blue-700">
-          {buttonText}
+          Locate Police Stations
         </Button>
         <p className="text-white text-sm mt-2">Click to view interactive map</p>
       </div>

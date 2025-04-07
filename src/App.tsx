@@ -1,96 +1,109 @@
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { useState } from "react";
+import { AuthProvider } from "@/contexts/AuthContext";
+import { OfficerAuthProvider } from "@/contexts/OfficerAuthContext";
+import ProtectedOfficerRoute from "@/components/officer/ProtectedOfficerRoute";
+import Index from "./pages/Index";
+import Home from "./pages/Home";
+import FeaturesPage from "./pages/Features";
+import HowItWorks from "./pages/HowItWorks";
+import SignIn from "./pages/SignIn";
+import GetStarted from "./pages/GetStarted";
+import NotFound from "./pages/NotFound";
+import LearnMore from "./pages/LearnMore";
+import ContinueReport from "./pages/ContinueReport";
+import CancelReport from "./pages/CancelReport";
+import ViewDraftReport from "./pages/ViewDraftReport";
+import GenerateDetailedReport from "./pages/GenerateDetailedReport";
+import ConnectWallet from "./pages/ConnectWallet";
+import LearnAboutRewards from "./pages/LearnAboutRewards";
+import ViewAllRewards from "./pages/ViewAllRewards";
+import RequestDemo from "./pages/RequestDemo";
+import EKycPage from "./pages/EKycPage";
+import PoliceStationsMap from "./pages/PoliceStationsMap";
+import CaseHeatmap from "./pages/CaseHeatmap";
+import PoliceStationDetail from "./pages/PoliceStationDetail";
+import HelpUsPage from "./pages/HelpUsPage";
+import SubmitTipPage from "./pages/SubmitTipPage";
+import AdvisoryPage from "./pages/AdvisoryPage";
+import AboutUs from "./pages/AboutUs";
+import OfficerLogin from "./pages/OfficerLogin";
+import OfficerRegistration from "./pages/OfficerRegistration";
+import OfficerDashboard from "./pages/OfficerDashboard";
+import OfficerProfile from "./pages/OfficerProfile";
+import OfficerSettings from "./pages/OfficerSettings";
+import Dashboard from "./pages/Dashboard";
+import Profile from "./pages/Profile";
+import MyReports from "./pages/MyReports";
 
-import './App.css';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import Home from './pages/Home';
-import Dashboard from './pages/Dashboard';
-import Features from './pages/Features';
-import GetStarted from './pages/GetStarted';
-import HowItWorks from './pages/HowItWorks';
-import AboutUs from './pages/AboutUs';
-import NotFound from './pages/NotFound';
-import RequestDemo from './pages/RequestDemo';
-import LearnMore from './pages/LearnMore';
-import SignIn from './pages/SignIn';
-import Profile from './pages/Profile';
-import { AuthProvider } from './contexts/AuthContext';
-import { OfficerAuthProvider } from './contexts/OfficerAuthContext';
-import { Toaster } from './components/ui/toaster';
-import { Toaster as SonnerToaster } from 'sonner';
-import PoliceStationsMap from './pages/PoliceStationsMap';
-import PoliceStationDetail from './pages/PoliceStationDetail';
-import AdvisoryPage from './pages/AdvisoryPage';
-import OfficerDashboard from './pages/OfficerDashboard';
-import OfficerLogin from './pages/OfficerLogin';
-import OfficerProfile from './pages/OfficerProfile';
-import OfficerSettings from './pages/OfficerSettings';
-import OfficerRegistration from './pages/OfficerRegistration';
-import ProtectedOfficerRoute from './components/officer/ProtectedOfficerRoute';
-import EKycPage from './pages/EKycPage';
-import ConnectWallet from './pages/ConnectWallet';
-import MyReports from './pages/MyReports';
-import GenerateDetailedReport from './pages/GenerateDetailedReport';
-import ViewDraftReport from './pages/ViewDraftReport';
-import ContinueReport from './pages/ContinueReport';
-import CancelReport from './pages/CancelReport';
-import LearnAboutRewards from './pages/LearnAboutRewards';
-import ViewAllRewards from './pages/ViewAllRewards';
-import HelpUsPage from './pages/HelpUsPage';
-import SubmitTipPage from './pages/SubmitTipPage';
-import CaseHeatmap from './pages/CaseHeatmap';
-import CaseDensityMap from './pages/CaseDensityMap';
+const App = () => {
+  // Create a new QueryClient instance inside the component function
+  const [queryClient] = useState(() => new QueryClient());
 
-function App() {
   return (
-    <Router>
+    <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <OfficerAuthProvider>
-          <Routes>
-            {/* Public Routes */}
-            <Route path="/" element={<Home />} />
-            <Route path="/features" element={<Features />} />
-            <Route path="/get-started" element={<GetStarted />} />
-            <Route path="/how-it-works" element={<HowItWorks />} />
-            <Route path="/about-us" element={<AboutUs />} />
-            <Route path="/request-demo" element={<RequestDemo />} />
-            <Route path="/learn-more" element={<LearnMore />} />
-            <Route path="/sign-in" element={<SignIn />} />
-            <Route path="/police-stations" element={<PoliceStationsMap />} />
-            <Route path="/police-stations/:id" element={<PoliceStationDetail />} />
-            <Route path="/advisories" element={<AdvisoryPage />} />
-            <Route path="/officer-login" element={<OfficerLogin />} />
-            <Route path="/officer-registration" element={<OfficerRegistration />} />
-            <Route path="/connect-wallet" element={<ConnectWallet />} />
-            <Route path="/e-kyc" element={<EKycPage />} />
-            <Route path="/case-heatmap" element={<CaseHeatmap />} />
-            <Route path="/case-density-map" element={<CaseDensityMap />} />
-            <Route path="/help-us" element={<HelpUsPage />} />
-            <Route path="/submit-tip" element={<SubmitTipPage />} />
-
-            {/* User Protected Routes */}
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/my-reports" element={<MyReports />} />
-            <Route path="/generate-detailed-report" element={<GenerateDetailedReport />} />
-            <Route path="/view-draft-report" element={<ViewDraftReport />} />
-            <Route path="/continue-report" element={<ContinueReport />} />
-            <Route path="/cancel-report" element={<CancelReport />} />
-            <Route path="/learn-about-rewards" element={<LearnAboutRewards />} />
-            <Route path="/view-all-rewards" element={<ViewAllRewards />} />
-
-            {/* Officer Protected Routes */}
-            <Route path="/officer-dashboard" element={<ProtectedOfficerRoute><OfficerDashboard /></ProtectedOfficerRoute>} />
-            <Route path="/officer-profile" element={<ProtectedOfficerRoute><OfficerProfile /></ProtectedOfficerRoute>} />
-            <Route path="/officer-settings" element={<ProtectedOfficerRoute><OfficerSettings /></ProtectedOfficerRoute>} />
-
-            {/* 404 Route */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-          <Toaster />
-          <SonnerToaster position="top-right" />
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <Routes>
+                <Route path="/" element={<Index />} />
+                <Route path="/home" element={<Home />} />
+                <Route path="/features" element={<FeaturesPage />} />
+                <Route path="/how-it-works" element={<HowItWorks />} />
+                <Route path="/signin" element={<SignIn />} />
+                <Route path="/get-started" element={<GetStarted />} />
+                <Route path="/learn-more" element={<LearnMore />} />
+                <Route path="/about-us" element={<AboutUs />} />
+                <Route path="/continue-report" element={<ContinueReport />} />
+                <Route path="/cancel-report" element={<CancelReport />} />
+                <Route path="/view-draft-report" element={<ViewDraftReport />} />
+                <Route path="/generate-detailed-report" element={<GenerateDetailedReport />} />
+                <Route path="/connect-wallet" element={<ConnectWallet />} />
+                <Route path="/learn-about-rewards" element={<LearnAboutRewards />} />
+                <Route path="/view-all-rewards" element={<ViewAllRewards />} />
+                <Route path="/request-demo" element={<RequestDemo />} />
+                <Route path="/e-kyc" element={<EKycPage />} />
+                <Route path="/police-stations" element={<PoliceStationsMap />} />
+                <Route path="/case-heatmap" element={<CaseHeatmap />} />
+                <Route path="/police-station/:id" element={<PoliceStationDetail />} />
+                <Route path="/help-us" element={<HelpUsPage />} />
+                <Route path="/submit-tip" element={<SubmitTipPage />} />
+                <Route path="/advisory" element={<AdvisoryPage />} />
+                <Route path="/officer-login" element={<OfficerLogin />} />
+                <Route path="/officer-registration" element={<OfficerRegistration />} />
+                <Route path="/officer-dashboard" element={
+                  <ProtectedOfficerRoute>
+                    <OfficerDashboard />
+                  </ProtectedOfficerRoute>
+                } />
+                <Route path="/officer-profile" element={
+                  <ProtectedOfficerRoute>
+                    <OfficerProfile />
+                  </ProtectedOfficerRoute>
+                } />
+                <Route path="/officer-settings" element={
+                  <ProtectedOfficerRoute>
+                    <OfficerSettings />
+                  </ProtectedOfficerRoute>
+                } />
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/profile" element={<Profile />} />
+                <Route path="/my-reports" element={<MyReports />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </BrowserRouter>
+          </TooltipProvider>
         </OfficerAuthProvider>
       </AuthProvider>
-    </Router>
+    </QueryClientProvider>
   );
-}
+};
 
 export default App;
