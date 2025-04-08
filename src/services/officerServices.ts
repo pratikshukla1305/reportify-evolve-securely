@@ -104,7 +104,7 @@ export const getKycVerifications = async (): Promise<KycVerification[]> => {
     
     // For each verification, check if there are additional documents
     for (let verification of verifications) {
-      // Ensure the documents property exists
+      // Initialize the documents array for each verification
       verification.documents = [];
       
       const { data: documents, error: docError } = await supabase
