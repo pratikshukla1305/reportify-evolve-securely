@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
@@ -17,7 +18,7 @@ const SOSAlertsList: React.FC<SOSAlertsListProps> = ({ limit }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedMessage, setSelectedMessage] = useState<string | null>(null);
   const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
-  const [audioElements, setAudioElements] = useState<{[key: string]: HTMLAudioElement}>({});
+  const audioRefs = useRef<{[key: string]: HTMLAudioElement | null}>({});
   const { toast } = useToast();
 
   const fetchAlerts = async () => {
@@ -42,9 +43,11 @@ const SOSAlertsList: React.FC<SOSAlertsListProps> = ({ limit }) => {
     
     // Cleanup audio elements when component unmounts
     return () => {
-      Object.values(audioElements).forEach(audio => {
-        audio.pause();
-        audio.src = '';
+      Object.values(audioRefs.current).forEach(audio => {
+        if (audio) {
+          audio.pause();
+          audio.src = '';
+        }
       });
     };
   }, [limit]);
@@ -84,7 +87,7 @@ const SOSAlertsList: React.FC<SOSAlertsListProps> = ({ limit }) => {
   };
 
   const getStatusBadge = (status: string) => {
-    switch (status.toLowerCase()) {
+    switch (status?.toLowerCase()) {
       case 'new':
         return <Badge className="bg-blue-500">New</Badge>;
       case 'in progress':
@@ -96,70 +99,73 @@ const SOSAlertsList: React.FC<SOSAlertsListProps> = ({ limit }) => {
     }
   };
 
-  const handlePlayPause = async (alertId: string) => {
-    // Check if audio element already exists for this alert
-    if (!audioElements[alertId]) {
-      // Create a new audio element if it doesn't exist
-      const audioElement = new Audio();
-      
-      audioElement.addEventListener('ended', () => {
-        setPlayingAudioId(null);
-      });
-      
-      audioElement.addEventListener('error', (e) => {
-        console.error('Audio error:', e);
-        toast({
-          title: "Audio Error",
-          description: "Could not play the voice recording. Please try a different audio format or URL.",
-          variant: "destructive",
-        });
-        setPlayingAudioId(null);
-      });
-      
-      setAudioElements(prev => ({
-        ...prev,
-        [alertId]: audioElement
-      }));
-    }
-    
+  const handlePlayPause = async (alertId: string, recordingUrl: string) => {
+    // Check if we're already playing this audio
     if (playingAudioId === alertId) {
-      // Currently playing this audio, pause it
-      audioElements[alertId]?.pause();
-      setPlayingAudioId(null);
+      // Pause the current audio
+      if (audioRefs.current[alertId]) {
+        audioRefs.current[alertId]?.pause();
+        setPlayingAudioId(null);
+      }
     } else {
       // Pause any currently playing audio
-      if (playingAudioId && audioElements[playingAudioId]) {
-        audioElements[playingAudioId]?.pause();
+      if (playingAudioId && audioRefs.current[playingAudioId]) {
+        audioRefs.current[playingAudioId]?.pause();
       }
       
-      // Use a sample audio for demonstration
-      const sampleAudioUrl = "https://www2.cs.uic.edu/~i101/SoundFiles/StarWars60.wav";
+      // If we don't have an audio element for this alert yet, create one
+      if (!audioRefs.current[alertId]) {
+        audioRefs.current[alertId] = new Audio();
+        
+        // Add event listeners
+        audioRefs.current[alertId]?.addEventListener('ended', () => {
+          setPlayingAudioId(null);
+        });
+        
+        audioRefs.current[alertId]?.addEventListener('error', (e) => {
+          console.error('Audio error:', e);
+          toast({
+            title: "Audio Error",
+            description: "Could not play the voice recording. Please try again later.",
+            variant: "destructive",
+          });
+          setPlayingAudioId(null);
+        });
+      }
       
-      if (audioElements[alertId]) {
-        audioElements[alertId].src = sampleAudioUrl;
-        
-        const playPromise = audioElements[alertId].play();
-        
-        if (playPromise !== undefined) {
-          playPromise
-            .then(() => {
-              setPlayingAudioId(alertId);
-              toast({
-                title: "Playing Demo Audio",
-                description: "This is a sample audio for demonstration purposes.",
+      try {
+        // Set the audio source directly from the recording URL
+        if (audioRefs.current[alertId]) {
+          audioRefs.current[alertId]!.src = recordingUrl;
+          
+          const playPromise = audioRefs.current[alertId]!.play();
+          
+          if (playPromise !== undefined) {
+            playPromise
+              .then(() => {
+                setPlayingAudioId(alertId);
+                toast({
+                  title: "Playing Recording",
+                  description: "Voice recording is now playing.",
+                });
+              })
+              .catch(err => {
+                console.error("Error playing audio:", err);
+                toast({
+                  title: "Audio Error",
+                  description: "Could not play the voice recording. Please try again later.",
+                  variant: "destructive",
+                });
               });
-            })
-            .catch(err => {
-              console.error("Error playing audio:", err);
-              toast({
-                title: "Audio Error",
-                description: "Could not play the sample audio. Please try again.",
-                variant: "destructive",
-              });
-            });
-        } else {
-          setPlayingAudioId(alertId);
+          }
         }
+      } catch (error) {
+        console.error("Error setting up audio playback:", error);
+        toast({
+          title: "Audio Error",
+          description: "Failed to set up audio playback.",
+          variant: "destructive",
+        });
       }
     }
   };
@@ -188,8 +194,8 @@ const SOSAlertsList: React.FC<SOSAlertsListProps> = ({ limit }) => {
             <div className="flex items-center space-x-2 mb-2 sm:mb-0">
               <AlertTriangle className="h-5 w-5 text-red-500" />
               <h3 className="font-medium text-lg">{alert.reported_by}</h3>
-              {getUrgencyBadge(alert.urgency_level)}
-              {getStatusBadge(alert.status)}
+              {alert.urgency_level && getUrgencyBadge(alert.urgency_level)}
+              {alert.status && getStatusBadge(alert.status)}
             </div>
             <div className="flex items-center space-x-2 text-sm text-gray-500">
               <Clock className="h-4 w-4" />
@@ -248,57 +254,24 @@ const SOSAlertsList: React.FC<SOSAlertsListProps> = ({ limit }) => {
             )}
             
             {alert.voice_recording && (
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => handlePlayPause(alert.alert_id)}
-                    className="border-purple-500 text-purple-600 hover:bg-purple-50"
-                  >
-                    {playingAudioId === alert.alert_id ? (
-                      <>
-                        <Pause className="h-4 w-4 mr-1" />
-                        Pause Recording
-                      </>
-                    ) : (
-                      <>
-                        <Play className="h-4 w-4 mr-1" />
-                        Play Recording
-                      </>
-                    )}
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-md">
-                  <DialogHeader>
-                    <DialogTitle>Voice Recording</DialogTitle>
-                  </DialogHeader>
-                  <div className="p-4 bg-gray-50 rounded-md text-center">
-                    <div className="mb-4">
-                      <Button 
-                        size="sm"
-                        onClick={() => handlePlayPause(alert.alert_id)}
-                        className="bg-purple-600 hover:bg-purple-700 text-white"
-                      >
-                        {playingAudioId === alert.alert_id ? (
-                          <>
-                            <Pause className="h-4 w-4 mr-2" />
-                            Pause
-                          </>
-                        ) : (
-                          <>
-                            <Play className="h-4 w-4 mr-2" />
-                            Play
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                    <p className="text-sm text-gray-500">
-                      Click to play or pause the voice recording
-                    </p>
-                  </div>
-                </DialogContent>
-              </Dialog>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => handlePlayPause(alert.alert_id, alert.voice_recording!)}
+                className="border-purple-500 text-purple-600 hover:bg-purple-50"
+              >
+                {playingAudioId === alert.alert_id ? (
+                  <>
+                    <Pause className="h-4 w-4 mr-1" />
+                    Pause Recording
+                  </>
+                ) : (
+                  <>
+                    <Play className="h-4 w-4 mr-1" />
+                    Play Recording
+                  </>
+                )}
+              </Button>
             )}
           </div>
           

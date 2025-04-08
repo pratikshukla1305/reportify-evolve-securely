@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { 
   SOSAlert, 
@@ -29,11 +28,15 @@ export const getSosAlerts = async (): Promise<SOSAlert[]> => {
     }
     
     // Look for voice recordings in the voice_recordings table
-    const { data: voiceRecordings } = await supabase
+    const { data: voiceRecordings, error: recordingError } = await supabase
       .from('voice_recordings')
       .select('recording_url')
       .eq('alert_id', alert.alert_id)
       .limit(1);
+    
+    if (recordingError) {
+      console.error('Error fetching voice recording:', recordingError);
+    }
     
     // If found, add to the alert object
     if (voiceRecordings && voiceRecordings.length > 0) {
@@ -77,10 +80,14 @@ export const getKycVerifications = async (): Promise<KycVerification[]> => {
   
   // For each verification, check if there are additional documents
   for (let verification of data) {
-    const { data: documents } = await supabase
+    const { data: documents, error: docError } = await supabase
       .from('kyc_documents')
       .select('*')
       .eq('verification_id', verification.id);
+    
+    if (docError) {
+      console.error('Error fetching KYC documents:', docError);
+    }
     
     // If documents found, attach them to the verification object
     if (documents && documents.length > 0) {
