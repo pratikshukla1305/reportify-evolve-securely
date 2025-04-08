@@ -21,6 +21,7 @@ const SOSAlertsList: React.FC<SOSAlertsListProps> = ({ limit }) => {
       const limitedData = limit ? data.slice(0, limit) : data;
       setAlerts(limitedData);
     } catch (error: any) {
+      console.error("Error fetching SOS alerts:", error);
       toast({
         title: "Error fetching alerts",
         description: error.message,
@@ -38,12 +39,13 @@ const SOSAlertsList: React.FC<SOSAlertsListProps> = ({ limit }) => {
   const handleStatusUpdate = async (alertId: string, status: string) => {
     try {
       await updateSosAlertStatus(alertId, status);
-      fetchAlerts();
       toast({
         title: "Status updated",
         description: `Alert status updated to ${status}`,
       });
+      fetchAlerts(); // Refresh the alerts after updating
     } catch (error: any) {
+      console.error("Error updating SOS alert status:", error);
       toast({
         title: "Error updating status",
         description: error.message,

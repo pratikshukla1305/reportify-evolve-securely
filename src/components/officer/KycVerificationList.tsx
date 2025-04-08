@@ -33,9 +33,11 @@ const KycVerificationList = ({ limit }: KycVerificationListProps) => {
     setIsLoading(true);
     try {
       const data = await getKycVerifications();
+      console.log("Fetched KYC verifications:", data);
       const limitedData = limit ? data.slice(0, limit) : data;
       setVerifications(limitedData);
     } catch (error: any) {
+      console.error("Error fetching KYC verifications:", error);
       toast({
         title: "Error fetching verifications",
         description: error.message,
@@ -69,6 +71,7 @@ const KycVerificationList = ({ limit }: KycVerificationListProps) => {
         description: "The user's identity has been verified successfully.",
       });
     } catch (error: any) {
+      console.error("Error approving KYC verification:", error);
       toast({
         title: "Error",
         description: error.message,
@@ -89,6 +92,7 @@ const KycVerificationList = ({ limit }: KycVerificationListProps) => {
         description: "The user's identity verification has been rejected.",
       });
     } catch (error: any) {
+      console.error("Error rejecting KYC verification:", error);
       toast({
         title: "Error",
         description: error.message,
@@ -140,7 +144,7 @@ const KycVerificationList = ({ limit }: KycVerificationListProps) => {
               <h4 className="font-medium">{verification.full_name}</h4>
               <p className="text-sm text-gray-500">{verification.email}</p>
               <div className="mt-1">
-                {getStatusBadge(verification.status)}
+                {getStatusBadge(verification.status || 'Pending')}
               </div>
             </div>
           </div>
@@ -154,7 +158,7 @@ const KycVerificationList = ({ limit }: KycVerificationListProps) => {
               <Eye className="h-4 w-4 mr-1" />
               View
             </Button>
-            {verification.status.toLowerCase() === 'pending' && (
+            {(!verification.status || verification.status.toLowerCase() === 'pending') && (
               <>
                 <Button 
                   variant="outline" 
@@ -207,7 +211,7 @@ const KycVerificationList = ({ limit }: KycVerificationListProps) => {
                     <div>
                       <p className="font-medium text-lg">{selectedVerification.full_name}</p>
                       <p className="text-sm text-gray-500">{selectedVerification.email}</p>
-                      <div className="mt-1">{getStatusBadge(selectedVerification.status)}</div>
+                      <div className="mt-1">{getStatusBadge(selectedVerification.status || 'Pending')}</div>
                     </div>
                   </div>
                   
@@ -231,7 +235,7 @@ const KycVerificationList = ({ limit }: KycVerificationListProps) => {
                       </div>
                       <div>
                         <Label className="text-xs text-gray-500">Status</Label>
-                        <div className="mt-1">{getStatusBadge(selectedVerification.status)}</div>
+                        <div className="mt-1">{getStatusBadge(selectedVerification.status || 'Pending')}</div>
                       </div>
                       
                       {selectedVerification.officer_action && (
@@ -280,7 +284,24 @@ const KycVerificationList = ({ limit }: KycVerificationListProps) => {
                         </div>
                       )}
                       
-                      {!selectedVerification.id_front && !selectedVerification.id_back && (
+                      {selectedVerification.documents && selectedVerification.documents.length > 0 && (
+                        <div className="mt-6">
+                          <h3 className="text-sm font-medium text-gray-500 mb-2">Additional Documents</h3>
+                          {selectedVerification.documents.map((doc, idx) => (
+                            <div key={idx} className="mb-4 p-3 border rounded-md">
+                              <p className="font-medium">{doc.document_type}</p>
+                              <img 
+                                src={doc.document_url} 
+                                alt={`Document ${idx + 1}`}
+                                className="mt-2 w-full h-auto rounded-md"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
+                      {!selectedVerification.id_front && !selectedVerification.id_back && 
+                       (!selectedVerification.documents || selectedVerification.documents.length === 0) && (
                         <div className="text-center py-12">
                           <p className="text-gray-500">No ID documents available</p>
                         </div>
@@ -318,7 +339,7 @@ const KycVerificationList = ({ limit }: KycVerificationListProps) => {
                 Close
               </Button>
               
-              {selectedVerification.status.toLowerCase() === 'pending' && (
+              {(!selectedVerification.status || selectedVerification.status.toLowerCase() === 'pending') && (
                 <div className="flex space-x-2">
                   <Button 
                     variant="outline" 

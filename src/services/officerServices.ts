@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { 
   SOSAlert, 
@@ -11,20 +12,26 @@ import {
 
 // SOS Alerts
 export const getSosAlerts = async (): Promise<SOSAlert[]> => {
-  // First, get all alerts
-  const { data: alerts, error } = await supabase
-    .from('sos_alerts')
-    .select('*')
-    .order('reported_time', { ascending: false });
-  
-  if (error) {
-    throw error;
-  }
-  
-  // Get all voice recordings in a single batch query
-  const alertIds = alerts.map(alert => alert.alert_id);
-  
-  if (alertIds.length > 0) {
+  try {
+    // First, get all alerts
+    const { data: alerts, error } = await supabase
+      .from('sos_alerts')
+      .select('*')
+      .order('reported_time', { ascending: false });
+    
+    if (error) {
+      console.error('Error fetching SOS alerts:', error);
+      throw error;
+    }
+    
+    // If no alerts found, return empty array
+    if (!alerts || alerts.length === 0) {
+      return [];
+    }
+    
+    // Get all voice recordings in a single batch query
+    const alertIds = alerts.map(alert => alert.alert_id);
+    
     const { data: voiceRecordings, error: recordingError } = await supabase
       .from('voice_recordings')
       .select('alert_id, recording_url')
@@ -36,7 +43,9 @@ export const getSosAlerts = async (): Promise<SOSAlert[]> => {
       // Create lookup map for quick access
       const recordingsMap = new Map();
       voiceRecordings.forEach(rec => {
-        recordingsMap.set(rec.alert_id, rec.recording_url);
+        if (rec.recording_url) {
+          recordingsMap.set(rec.alert_id, rec.recording_url);
+        }
       });
       
       // Attach recordings to corresponding alerts
@@ -46,9 +55,12 @@ export const getSosAlerts = async (): Promise<SOSAlert[]> => {
         }
       });
     }
+    
+    return alerts;
+  } catch (error) {
+    console.error('Error in getSosAlerts:', error);
+    throw error;
   }
-  
-  return alerts || [];
 };
 
 export const updateSosAlertStatus = async (alertId: string, status: string, dispatchTeam?: string): Promise<SOSAlert[]> => {
@@ -73,37 +85,48 @@ export const updateSosAlertStatus = async (alertId: string, status: string, disp
 
 // KYC Verifications
 export const getKycVerifications = async (): Promise<KycVerification[]> => {
-  const { data, error } = await supabase
-    .from('kyc_verifications')
-    .select('*')
-    .order('submission_date', { ascending: false });
-  
-  if (error) {
+  try {
+    // First, get all verifications
+    const { data: verifications, error } = await supabase
+      .from('kyc_verifications')
+      .select('*')
+      .order('submission_date', { ascending: false });
+    
+    if (error) {
+      console.error('Error fetching KYC verifications:', error);
+      throw error;
+    }
+    
+    // If no verifications found, return empty array
+    if (!verifications || verifications.length === 0) {
+      return [];
+    }
+    
+    // For each verification, check if there are additional documents
+    for (let verification of verifications) {
+      // Ensure the documents property exists
+      verification.documents = [];
+      
+      const { data: documents, error: docError } = await supabase
+        .from('kyc_documents')
+        .select('*')
+        .eq('verification_id', verification.id);
+      
+      if (docError) {
+        console.error('Error fetching KYC documents:', docError);
+      }
+      
+      // If documents found, attach them to the verification object
+      if (documents && documents.length > 0) {
+        verification.documents = documents as KycDocument[];
+      }
+    }
+    
+    return verifications;
+  } catch (error) {
+    console.error('Error in getKycVerifications:', error);
     throw error;
   }
-  
-  // For each verification, check if there are additional documents
-  for (let verification of data) {
-    const { data: documents, error: docError } = await supabase
-      .from('kyc_documents')
-      .select('*')
-      .eq('verification_id', verification.id);
-    
-    if (docError) {
-      console.error('Error fetching KYC documents:', docError);
-    }
-    
-    // If documents found, attach them to the verification object
-    if (documents && documents.length > 0) {
-      // Using type assertion to ensure TypeScript knows documents exists
-      (verification as KycVerification).documents = documents as KycDocument[];
-    } else {
-      // Initialize with empty array to avoid undefined errors
-      (verification as KycVerification).documents = [];
-    }
-  }
-  
-  return data || [];
 };
 
 export const updateKycVerificationStatus = async (id: number, status: string, officerAction?: string): Promise<KycVerification[]> => {
