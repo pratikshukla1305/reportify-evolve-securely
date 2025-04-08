@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { 
   SOSAlert, 
@@ -103,29 +102,43 @@ export const getKycVerifications = async (): Promise<KycVerification[]> => {
     }
     
     // Prepare the result array with proper typing
-    const typedVerifications: KycVerification[] = verifications.map(v => ({
-      ...v,
-      documents: [] // Ensure documents array is initialized
+    const results: KycVerification[] = verifications.map(verification => ({
+      ...verification,
+      documents: [] // Initialize documents array for each verification
     }));
     
-    // For each verification, check if there are additional documents
-    for (let verification of typedVerifications) {
-      const { data: documents, error: docError } = await supabase
-        .from('kyc_documents')
-        .select('*')
-        .eq('verification_id', verification.id);
+    // Get the verification ids for batch query
+    const verificationIds = verifications.map(v => v.id);
+    
+    // Get all documents in a single batch query
+    const { data: allDocuments, error: docError } = await supabase
+      .from('kyc_documents')
+      .select('*')
+      .in('verification_id', verificationIds);
+    
+    if (docError) {
+      console.error('Error fetching KYC documents:', docError);
+    } else if (allDocuments && allDocuments.length > 0) {
+      // Group documents by verification_id
+      const documentsByVerification = new Map<number, KycDocument[]>();
       
-      if (docError) {
-        console.error('Error fetching KYC documents:', docError);
-      }
+      allDocuments.forEach(doc => {
+        const verificationId = doc.verification_id;
+        if (!documentsByVerification.has(verificationId)) {
+          documentsByVerification.set(verificationId, []);
+        }
+        documentsByVerification.get(verificationId)!.push(doc as KycDocument);
+      });
       
-      // If documents found, attach them to the verification object
-      if (documents && documents.length > 0) {
-        verification.documents = documents as KycDocument[];
-      }
+      // Attach documents to corresponding verifications
+      results.forEach(verification => {
+        if (documentsByVerification.has(verification.id)) {
+          verification.documents = documentsByVerification.get(verification.id)!;
+        }
+      });
     }
     
-    return typedVerifications;
+    return results;
   } catch (error) {
     console.error('Error in getKycVerifications:', error);
     throw error;
@@ -149,7 +162,27 @@ export const updateKycVerificationStatus = async (id: number, status: string, of
     throw error;
   }
   
-  return data || [];
+  // Initialize documents array for each verification
+  const results: KycVerification[] = (data || []).map(item => ({
+    ...item,
+    documents: []
+  }));
+  
+  // If we have results, fetch the documents for each verification
+  if (results.length > 0) {
+    const { data: documents, error: docError } = await supabase
+      .from('kyc_documents')
+      .select('*')
+      .eq('verification_id', id);
+    
+    if (docError) {
+      console.error('Error fetching KYC documents for updated verification:', docError);
+    } else if (documents) {
+      results[0].documents = documents as KycDocument[];
+    }
+  }
+  
+  return results;
 };
 
 // Advisories

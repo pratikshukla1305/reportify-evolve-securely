@@ -1,6 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { SOSAlert, KycVerification, Advisory, CriminalProfile, CaseData, CriminalTip } from '@/types/officer';
+import { SOSAlert, KycVerification, Advisory, CriminalProfile, CaseData, CriminalTip, KycDocument } from '@/types/officer';
 
 // SOS Alerts
 export const submitSOSAlert = async (alertData: any): Promise<SOSAlert[]> => {
@@ -67,6 +67,12 @@ export const submitKycVerification = async (verificationData: any): Promise<KycV
     throw error;
   }
   
+  // Initialize the documents array
+  const results: KycVerification[] = data.map(item => ({
+    ...item,
+    documents: []
+  }));
+  
   // If documents are provided, store them in the kyc_documents table
   if (verificationData.documents && verificationData.documents.length > 0) {
     const documentsToInsert = verificationData.documents.map((doc: any) => ({
@@ -76,17 +82,21 @@ export const submitKycVerification = async (verificationData: any): Promise<KycV
       extracted_data: doc.extracted_data || null
     }));
     
-    const { error: docError } = await supabase
+    const { data: docData, error: docError } = await supabase
       .from('kyc_documents')
-      .insert(documentsToInsert);
+      .insert(documentsToInsert)
+      .select();
       
     if (docError) {
       console.error("Error saving KYC documents:", docError);
       // Don't throw here, as the verification was already saved
+    } else if (docData) {
+      // Attach the documents to the result
+      results[0].documents = docData as KycDocument[];
     }
   }
   
-  return data || [];
+  return results;
 };
 
 export const getUserKycStatus = async (email: string): Promise<KycVerification | null> => {
@@ -102,7 +112,24 @@ export const getUserKycStatus = async (email: string): Promise<KycVerification |
     throw error;
   }
   
-  return data;
+  if (!data) {
+    return null;
+  }
+  
+  // Get documents for this verification
+  const { data: documents, error: docError } = await supabase
+    .from('kyc_documents')
+    .select('*')
+    .eq('verification_id', data.id);
+  
+  if (docError) {
+    console.error("Error fetching KYC documents:", docError);
+  }
+  
+  return {
+    ...data,
+    documents: documents || []
+  };
 };
 
 // Advisories
