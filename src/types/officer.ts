@@ -37,6 +37,17 @@ export interface KycVerification {
   selfie?: string;
   rejection_reason?: string;
   created_at?: string;
+  documents?: KycDocument[]; // Added this property
+}
+
+// Add interface for KYC documents
+export interface KycDocument {
+  id: string;
+  verification_id: number;
+  document_type: string;
+  document_url: string;
+  extracted_data?: any;
+  created_at?: string;
 }
 
 export interface Advisory {

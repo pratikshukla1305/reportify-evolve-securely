@@ -6,7 +6,8 @@ import {
   Advisory, 
   CriminalProfile, 
   CaseData,
-  CriminalTip
+  CriminalTip,
+  KycDocument
 } from '@/types/officer';
 
 // SOS Alerts
@@ -83,7 +84,11 @@ export const getKycVerifications = async (): Promise<KycVerification[]> => {
     
     // If documents found, attach them to the verification object
     if (documents && documents.length > 0) {
-      verification.documents = documents;
+      // Using type assertion to ensure TypeScript knows documents exists
+      (verification as KycVerification).documents = documents as KycDocument[];
+    } else {
+      // Initialize with empty array to avoid undefined errors
+      (verification as KycVerification).documents = [];
     }
   }
   
