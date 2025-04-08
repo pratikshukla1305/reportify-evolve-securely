@@ -11,7 +11,8 @@ import {
 
 // SOS Alerts
 export const getSosAlerts = async (): Promise<SOSAlert[]> => {
-  const { data, error } = await supabase
+  // First, get all alerts
+  const { data: alerts, error } = await supabase
     .from('sos_alerts')
     .select('*')
     .order('reported_time', { ascending: false });
@@ -20,31 +21,34 @@ export const getSosAlerts = async (): Promise<SOSAlert[]> => {
     throw error;
   }
   
-  // For each alert, check if there's a voice recording
-  for (let alert of data) {
-    if (alert.voice_recording) {
-      // We already have the voice recording URL in the alert object
-      continue;
-    }
-    
-    // Look for voice recordings in the voice_recordings table
+  // Get all voice recordings in a single batch query
+  const alertIds = alerts.map(alert => alert.alert_id);
+  
+  if (alertIds.length > 0) {
     const { data: voiceRecordings, error: recordingError } = await supabase
       .from('voice_recordings')
-      .select('recording_url')
-      .eq('alert_id', alert.alert_id)
-      .limit(1);
+      .select('alert_id, recording_url')
+      .in('alert_id', alertIds);
     
     if (recordingError) {
-      console.error('Error fetching voice recording:', recordingError);
-    }
-    
-    // If found, add to the alert object
-    if (voiceRecordings && voiceRecordings.length > 0) {
-      alert.voice_recording = voiceRecordings[0].recording_url;
+      console.error('Error fetching voice recordings:', recordingError);
+    } else if (voiceRecordings && voiceRecordings.length > 0) {
+      // Create lookup map for quick access
+      const recordingsMap = new Map();
+      voiceRecordings.forEach(rec => {
+        recordingsMap.set(rec.alert_id, rec.recording_url);
+      });
+      
+      // Attach recordings to corresponding alerts
+      alerts.forEach(alert => {
+        if (recordingsMap.has(alert.alert_id)) {
+          alert.voice_recording = recordingsMap.get(alert.alert_id);
+        }
+      });
     }
   }
   
-  return data || [];
+  return alerts || [];
 };
 
 export const updateSosAlertStatus = async (alertId: string, status: string, dispatchTeam?: string): Promise<SOSAlert[]> => {
