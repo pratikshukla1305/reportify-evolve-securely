@@ -532,7 +532,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      register_officer: {
+        Args: {
+          full_name: string
+          badge_number: string
+          department: string
+          department_email: string
+          phone_number: string
+          password: string
+          confirm_password: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never

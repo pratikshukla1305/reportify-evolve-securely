@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { 
   SOSAlert, 
@@ -32,7 +33,6 @@ export const getSosAlerts = async (): Promise<SOSAlert[]> => {
     const alertIds = alerts.map(alert => alert.alert_id);
     
     const { data: voiceRecordings, error: recordingError } = await supabase
-      .channel('public:voice_recordings')
       .from('voice_recordings')
       .select('alert_id, recording_url')
       .in('alert_id', alertIds);
