@@ -13,6 +13,23 @@ export const submitSOSAlert = async (alertData: any): Promise<SOSAlert[]> => {
     throw error;
   }
   
+  // If a voice recording URL is provided, store it in the voice_recordings table
+  if (alertData.voice_recording) {
+    const { error: voiceError } = await supabase
+      .from('voice_recordings')
+      .insert([
+        {
+          alert_id: data[0].alert_id,
+          recording_url: alertData.voice_recording
+        }
+      ]);
+      
+    if (voiceError) {
+      console.error("Error saving voice recording:", voiceError);
+      // Don't throw here, as the alert was already saved
+    }
+  }
+  
   return data || [];
 };
 
@@ -32,13 +49,41 @@ export const getUserSOSAlerts = async (userId: string): Promise<SOSAlert[]> => {
 
 // KYC Verification
 export const submitKycVerification = async (verificationData: any): Promise<KycVerification[]> => {
+  // First insert the main verification data
   const { data, error } = await supabase
     .from('kyc_verifications')
-    .insert([verificationData])
+    .insert([{
+      full_name: verificationData.full_name,
+      email: verificationData.email,
+      submission_date: new Date().toISOString(),
+      status: 'Pending',
+      id_front: verificationData.id_front,
+      id_back: verificationData.id_back,
+      selfie: verificationData.selfie
+    }])
     .select();
   
   if (error) {
     throw error;
+  }
+  
+  // If documents are provided, store them in the kyc_documents table
+  if (verificationData.documents && verificationData.documents.length > 0) {
+    const documentsToInsert = verificationData.documents.map((doc: any) => ({
+      verification_id: data[0].id,
+      document_type: doc.type,
+      document_url: doc.url,
+      extracted_data: doc.extracted_data || null
+    }));
+    
+    const { error: docError } = await supabase
+      .from('kyc_documents')
+      .insert(documentsToInsert);
+      
+    if (docError) {
+      console.error("Error saving KYC documents:", docError);
+      // Don't throw here, as the verification was already saved
+    }
   }
   
   return data || [];

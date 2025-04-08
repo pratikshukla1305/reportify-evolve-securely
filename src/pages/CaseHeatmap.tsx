@@ -44,10 +44,9 @@ const CaseHeatmap = () => {
   const totalCases = filteredCaseData.reduce((sum, item) => sum + item.count, 0);
   const highestDensityArea = [...filteredCaseData].sort((a, b) => b.count - a.count)[0]?.region || "N/A";
 
-  // Create Google Maps URL for the highest density region
   const getGoogleMapsUrl = () => {
-    // Default to Chennai if no data
-    const region = highestDensityArea !== "N/A" ? highestDensityArea : "Chennai";
+    let region = highestDensityArea !== "N/A" ? highestDensityArea : "Chennai";
+    region = `${region} crime hotspots`;
     return `https://www.google.com/maps/search/${encodeURIComponent(region)}`;
   };
 
@@ -160,8 +159,8 @@ const CaseHeatmap = () => {
                 <StaticMap
                   altText="Case Density Map"
                   redirectPath={getGoogleMapsUrl()}
-                  buttonText="View Interactive Case Map"
-                  description="Click to see detailed case heat map"
+                  buttonText="View Crime Hotspot Map"
+                  description="Click to see detailed crime hotspots on Google Maps"
                 />
               </div>
             ) : (

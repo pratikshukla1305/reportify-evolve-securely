@@ -20,6 +20,26 @@ export const getSosAlerts = async (): Promise<SOSAlert[]> => {
     throw error;
   }
   
+  // For each alert, check if there's a voice recording
+  for (let alert of data) {
+    if (alert.voice_recording) {
+      // We already have the voice recording URL in the alert object
+      continue;
+    }
+    
+    // Look for voice recordings in the voice_recordings table
+    const { data: voiceRecordings } = await supabase
+      .from('voice_recordings')
+      .select('recording_url')
+      .eq('alert_id', alert.alert_id)
+      .limit(1);
+    
+    // If found, add to the alert object
+    if (voiceRecordings && voiceRecordings.length > 0) {
+      alert.voice_recording = voiceRecordings[0].recording_url;
+    }
+  }
+  
   return data || [];
 };
 
@@ -52,6 +72,19 @@ export const getKycVerifications = async (): Promise<KycVerification[]> => {
   
   if (error) {
     throw error;
+  }
+  
+  // For each verification, check if there are additional documents
+  for (let verification of data) {
+    const { data: documents } = await supabase
+      .from('kyc_documents')
+      .select('*')
+      .eq('verification_id', verification.id);
+    
+    // If documents found, attach them to the verification object
+    if (documents && documents.length > 0) {
+      verification.documents = documents;
+    }
   }
   
   return data || [];

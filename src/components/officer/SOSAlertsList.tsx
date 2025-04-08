@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { PhoneCall, MapPin, Clock, AlertTriangle, MessageSquare, Play, Pause } from 'lucide-react';
 import { getSosAlerts, updateSosAlertStatus } from '@/services/officerServices';
+import { supabase } from '@/integrations/supabase/client';
 import { SOSAlert } from '@/types/officer';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
@@ -95,7 +96,7 @@ const SOSAlertsList: React.FC<SOSAlertsListProps> = ({ limit }) => {
     }
   };
 
-  const handlePlayPause = (alertId: string, recordingUrl: string) => {
+  const handlePlayPause = async (alertId: string) => {
     // Check if audio element already exists for this alert
     if (!audioElements[alertId]) {
       // Create a new audio element if it doesn't exist
@@ -131,8 +132,7 @@ const SOSAlertsList: React.FC<SOSAlertsListProps> = ({ limit }) => {
         audioElements[playingAudioId]?.pause();
       }
       
-      // Play a sample MP3 file instead of the actual recording URL
-      // This is a workaround for demo purposes
+      // Use a sample audio for demonstration
       const sampleAudioUrl = "https://www2.cs.uic.edu/~i101/SoundFiles/StarWars60.wav";
       
       if (audioElements[alertId]) {
@@ -253,7 +253,7 @@ const SOSAlertsList: React.FC<SOSAlertsListProps> = ({ limit }) => {
                   <Button 
                     variant="outline" 
                     size="sm"
-                    onClick={() => handlePlayPause(alert.alert_id, "sample.mp3")}
+                    onClick={() => handlePlayPause(alert.alert_id)}
                     className="border-purple-500 text-purple-600 hover:bg-purple-50"
                   >
                     {playingAudioId === alert.alert_id ? (
@@ -277,7 +277,7 @@ const SOSAlertsList: React.FC<SOSAlertsListProps> = ({ limit }) => {
                     <div className="mb-4">
                       <Button 
                         size="sm"
-                        onClick={() => handlePlayPause(alert.alert_id, "sample.mp3")}
+                        onClick={() => handlePlayPause(alert.alert_id)}
                         className="bg-purple-600 hover:bg-purple-700 text-white"
                       >
                         {playingAudioId === alert.alert_id ? (
