@@ -32,6 +32,7 @@ export const getSosAlerts = async (): Promise<SOSAlert[]> => {
     const alertIds = alerts.map(alert => alert.alert_id);
     
     const { data: voiceRecordings, error: recordingError } = await supabase
+      .channel('public:voice_recordings')
       .from('voice_recordings')
       .select('alert_id, recording_url')
       .in('alert_id', alertIds);
@@ -185,7 +186,6 @@ export const updateKycVerificationStatus = async (id: number, status: string, of
   return results;
 };
 
-// Advisories
 export const getAdvisories = async (): Promise<Advisory[]> => {
   const { data, error } = await supabase
     .from('advisories')
@@ -226,7 +226,6 @@ export const updateAdvisory = async (id: number, advisory: any): Promise<Advisor
   return data || [];
 };
 
-// Criminal Profiles
 export const getCriminalProfiles = async (): Promise<CriminalProfile[]> => {
   const { data, error } = await supabase
     .from('criminal_profiles')
@@ -267,7 +266,6 @@ export const updateCriminalProfile = async (id: number, profile: any): Promise<C
   return data || [];
 };
 
-// Cases for mapping
 export const getCases = async (): Promise<CaseData[]> => {
   const { data, error } = await supabase
     .from('cases')
@@ -308,7 +306,6 @@ export const updateCase = async (id: number, caseData: any): Promise<CaseData[]>
   return data || [];
 };
 
-// Criminal Tips
 export const getCriminalTips = async (): Promise<CriminalTip[]> => {
   const { data, error } = await supabase
     .from('criminal_tips')
@@ -334,4 +331,30 @@ export const updateCriminalTipStatus = async (id: number, status: string): Promi
   }
   
   return data || [];
+};
+
+export const registerOfficer = async (officerData: any): Promise<any> => {
+  try {
+    // Use RPC call to bypass RLS for registration
+    const { data, error } = await supabase
+      .rpc('register_officer', {
+        full_name: officerData.full_name,
+        badge_number: officerData.badge_number,
+        department: officerData.department,
+        department_email: officerData.department_email,
+        phone_number: officerData.phone_number,
+        password: officerData.password,
+        confirm_password: officerData.confirm_password
+      });
+    
+    if (error) {
+      console.error('Error registering officer:', error);
+      throw error;
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('Error in registerOfficer:', error);
+    throw error;
+  }
 };
