@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Play, Pause } from 'lucide-react';
+import { Play, Pause, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface VoiceRecordingPlayerProps {
@@ -19,17 +19,25 @@ const VoiceRecordingPlayer: React.FC<VoiceRecordingPlayerProps> = ({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const { toast } = useToast();
 
+  // Log when recordingUrl changes to help debug
+  useEffect(() => {
+    console.log('VoiceRecordingPlayer received URL:', recordingUrl);
+  }, [recordingUrl]);
+
   // Create audio element when component mounts
   useEffect(() => {
     const audio = new Audio();
     
     // Add event listeners
     audio.addEventListener('ended', () => setIsPlaying(false));
-    audio.addEventListener('canplaythrough', () => setIsLoading(false));
+    audio.addEventListener('canplaythrough', () => {
+      console.log('Audio can play through');
+      setIsLoading(false);
+    });
     
     audio.addEventListener('error', (e) => {
-      console.error('Audio error:', e);
-      setError('Failed to load audio file');
+      console.error('Audio error:', e, audio.error);
+      setError(`Failed to load audio: ${audio.error?.message || 'Unknown error'}`);
       setIsPlaying(false);
       setIsLoading(false);
       
@@ -57,19 +65,35 @@ const VoiceRecordingPlayer: React.FC<VoiceRecordingPlayerProps> = ({
   // Update audio source when recordingUrl changes
   useEffect(() => {
     if (audioRef.current && recordingUrl) {
+      console.log('Setting audio source to:', recordingUrl);
       audioRef.current.src = recordingUrl;
       setError(null);
     }
   }, [recordingUrl]);
 
   const handlePlayPause = () => {
-    if (!audioRef.current) return;
+    if (!audioRef.current) {
+      console.error('Audio ref is null');
+      return;
+    }
+    
+    if (!recordingUrl) {
+      console.error('No recording URL provided');
+      toast({
+        title: "Missing Audio",
+        description: "No voice recording URL was provided.",
+        variant: "destructive",
+      });
+      return;
+    }
     
     try {
       if (isPlaying) {
+        console.log('Pausing audio');
         audioRef.current.pause();
         setIsPlaying(false);
       } else {
+        console.log('Attempting to play audio from:', recordingUrl);
         setIsLoading(true);
         setError(null);
         
@@ -81,6 +105,7 @@ const VoiceRecordingPlayer: React.FC<VoiceRecordingPlayerProps> = ({
         if (playPromise !== undefined) {
           playPromise
             .then(() => {
+              console.log('Audio playing successfully');
               setIsPlaying(true);
               toast({
                 title: "Playing Recording",
@@ -89,7 +114,7 @@ const VoiceRecordingPlayer: React.FC<VoiceRecordingPlayerProps> = ({
             })
             .catch(err => {
               console.error("Error playing audio:", err);
-              setError("Failed to play audio");
+              setError(`Failed to play audio: ${err.message}`);
               setIsLoading(false);
               
               toast({
@@ -100,9 +125,9 @@ const VoiceRecordingPlayer: React.FC<VoiceRecordingPlayerProps> = ({
             });
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("VoiceRecordingPlayer error:", error);
-      setError("An unexpected error occurred");
+      setError(`An unexpected error occurred: ${error.message}`);
       setIsLoading(false);
       
       toast({
@@ -113,12 +138,27 @@ const VoiceRecordingPlayer: React.FC<VoiceRecordingPlayerProps> = ({
     }
   };
 
+  // If URL is empty, show a different state
+  if (!recordingUrl) {
+    return (
+      <Button 
+        variant="outline" 
+        size="sm"
+        disabled={true}
+        className="border-gray-300 text-gray-400"
+      >
+        <AlertTriangle className="h-4 w-4 mr-1" />
+        No Recording Available
+      </Button>
+    );
+  }
+
   return (
     <Button 
       variant="outline" 
       size="sm"
       onClick={handlePlayPause}
-      disabled={isLoading || !!error || !recordingUrl}
+      disabled={isLoading || !!error}
       className={`${error ? 'border-red-500 text-red-600 hover:bg-red-50' : 'border-purple-500 text-purple-600 hover:bg-purple-50'}`}
     >
       {isLoading ? (
@@ -133,7 +173,7 @@ const VoiceRecordingPlayer: React.FC<VoiceRecordingPlayerProps> = ({
         </>
       ) : error ? (
         <>
-          <span className="h-4 w-4 mr-1">⚠️</span>
+          <AlertTriangle className="h-4 w-4 mr-1" />
           Audio Unavailable
         </>
       ) : (

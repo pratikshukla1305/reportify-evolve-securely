@@ -102,11 +102,14 @@ export const getKycVerifications = async (): Promise<KycVerification[]> => {
       return [];
     }
     
+    // Prepare the result array with proper typing
+    const typedVerifications: KycVerification[] = verifications.map(v => ({
+      ...v,
+      documents: [] // Ensure documents array is initialized
+    }));
+    
     // For each verification, check if there are additional documents
-    for (let verification of verifications) {
-      // Initialize the documents array for each verification
-      verification.documents = [];
-      
+    for (let verification of typedVerifications) {
       const { data: documents, error: docError } = await supabase
         .from('kyc_documents')
         .select('*')
@@ -122,7 +125,7 @@ export const getKycVerifications = async (): Promise<KycVerification[]> => {
       }
     }
     
-    return verifications;
+    return typedVerifications;
   } catch (error) {
     console.error('Error in getKycVerifications:', error);
     throw error;

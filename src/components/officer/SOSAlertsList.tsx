@@ -18,6 +18,7 @@ const SOSAlertsList: React.FC<SOSAlertsListProps> = ({ limit }) => {
     setIsLoading(true);
     try {
       const data = await getSosAlerts();
+      console.log("Fetched SOS alerts:", data);
       const limitedData = limit ? data.slice(0, limit) : data;
       setAlerts(limitedData);
     } catch (error: any) {

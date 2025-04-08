@@ -1,4 +1,3 @@
-
 export interface Officer {
   id: number;
   full_name: string;
@@ -37,10 +36,9 @@ export interface KycVerification {
   selfie?: string;
   rejection_reason?: string;
   created_at?: string;
-  documents?: KycDocument[]; // Added this property
+  documents: KycDocument[]; // Changed from optional to required property
 }
 
-// Add interface for KYC documents
 export interface KycDocument {
   id: string;
   verification_id: number;
