@@ -92,24 +92,28 @@ serve(async (req) => {
     
     // If we have a reportId, store the analysis in the database
     if (reportId) {
-      const { error } = await supabase
-        .from('crime_report_analysis')
-        .upsert({
-          report_id: reportId,
-          crime_type: analysisResult.crimeType,
-          confidence: analysisResult.confidence,
-          description: analysisResult.description,
-          model_version: 'v1.0'
-        });
-      
-      if (error) {
-        console.error("Error storing analysis in database:", error);
-      } else {
-        // Update the queue status
-        await supabase
-          .from('video_analysis_queue')
-          .update({ status: 'completed', processed_at: new Date().toISOString() })
-          .eq('report_id', reportId);
+      try {
+        const { error } = await supabase
+          .from('crime_report_analysis')
+          .upsert({
+            report_id: reportId,
+            crime_type: analysisResult.crimeType,
+            confidence: analysisResult.confidence,
+            description: analysisResult.description,
+            model_version: 'v1.0'
+          });
+        
+        if (error) {
+          console.error("Error storing analysis in database:", error);
+        } else {
+          // Update the queue status
+          await supabase
+            .from('video_analysis_queue')
+            .update({ status: 'completed', processed_at: new Date().toISOString() })
+            .eq('report_id', reportId);
+        }
+      } catch (dbError) {
+        console.error("Database error:", dbError);
       }
     }
     
