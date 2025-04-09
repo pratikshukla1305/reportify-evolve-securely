@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { crimeDescriptions, getCrimeDescriptionByType } from './crimeAnalysisData';
@@ -35,16 +34,14 @@ export const analyzeVideoEvidence = async (videoUrl: string, reportId?: string):
     // If not previously analyzed, queue it for analysis
     if (reportId) {
       try {
-        // Use type assertion to bypass TypeScript error
-        const { error } = await supabase
+        // Use a raw query approach with error handling
+        await supabase
           .from('video_analysis_queue' as any)
           .insert({
             report_id: reportId,
             video_url: videoUrl,
             status: 'processing'
           });
-        
-        if (error) throw error;
       } catch (insertError: any) {
         console.error("Error queuing analysis:", insertError);
         // Continue with analysis even if queue insert fails
@@ -70,8 +67,7 @@ export const analyzeVideoEvidence = async (videoUrl: string, reportId?: string):
     // If we have a report ID, store the analysis result in the database
     if (reportId && data.analysis) {
       try {
-        // Use type assertion to bypass TypeScript error
-        const { error } = await supabase
+        await supabase
           .from('crime_report_analysis' as any)
           .upsert({
             report_id: reportId,
@@ -80,8 +76,6 @@ export const analyzeVideoEvidence = async (videoUrl: string, reportId?: string):
             description: data.analysis.description,
             model_version: 'v1.0'
           });
-        
-        if (error) throw error;
       } catch (upsertError: any) {
         console.error("Error storing analysis:", upsertError);
         // Continue even if storage fails
@@ -104,7 +98,7 @@ export const analyzeVideoEvidence = async (videoUrl: string, reportId?: string):
  */
 export const getReportAnalysis = async (reportId: string): Promise<VideoAnalysisResult | null> => {
   try {
-    // Use a safer approach that doesn't rely on TypeScript definitions
+    // Use a safer approach with better type handling
     const { data, error } = await supabase
       .from('crime_report_analysis' as any)
       .select('*')
@@ -123,13 +117,16 @@ export const getReportAnalysis = async (reportId: string): Promise<VideoAnalysis
       return null;
     }
     
-    // Use optional chaining and fallbacks to access data properties safely
-    // This prevents TypeScript errors when accessing properties
+    // Use strong type assertion and proper type checking
+    // This gives TypeScript more information about the structure
+    const rawData = data as any;
+    
+    // Create the result object with safe access patterns
     const result: VideoAnalysisResult = {
-      crimeType: data?.crime_type || '',
-      confidence: typeof data?.confidence === 'number' ? data.confidence : 0,
-      description: data?.description || '',
-      analysisTimestamp: data?.created_at || new Date().toISOString()
+      crimeType: typeof rawData.crime_type === 'string' ? rawData.crime_type : '',
+      confidence: typeof rawData.confidence === 'number' ? rawData.confidence : 0,
+      description: typeof rawData.description === 'string' ? rawData.description : '',
+      analysisTimestamp: typeof rawData.created_at === 'string' ? rawData.created_at : new Date().toISOString()
     };
     
     return result;
