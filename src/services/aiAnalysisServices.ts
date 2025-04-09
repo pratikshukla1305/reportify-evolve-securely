@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { crimeDescriptions, getCrimeDescriptionByType } from './crimeAnalysisData';
@@ -49,6 +50,7 @@ export const analyzeVideoEvidence = async (videoUrl: string, reportId?: string):
     }
     
     // Call the edge function to analyze the video
+    // The edge function will attempt to use the Python model service if available
     const { data, error } = await supabase.functions.invoke('analyze-video-evidence', {
       body: { videoUrl, reportId }
     });

@@ -21,13 +21,14 @@ const descriptions = {
 // Function to try connecting to local FastAPI model if available
 async function tryLocalModel(videoUrl: string): Promise<any | null> {
   try {
+    // Configure this to point to your Python FastAPI model service
     const localModelUrl = "http://localhost:8000/analyze-video";
     const response = await fetch(localModelUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ video_url: videoUrl }),
       // Short timeout to fail fast if local model isn't running
-      signal: AbortSignal.timeout(2000)
+      signal: AbortSignal.timeout(5000)
     });
     
     if (response.ok) {
@@ -62,7 +63,7 @@ serve(async (req) => {
     // Create a Supabase client with the Admin key to have full access
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Try to use local FastAPI model if available
+    // Try to use local Python FastAPI model service if available
     let modelResult = await tryLocalModel(videoUrl);
     
     // If local model fails or isn't available, use fallback simulation
