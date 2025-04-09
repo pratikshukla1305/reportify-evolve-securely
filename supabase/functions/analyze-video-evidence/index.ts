@@ -10,6 +10,37 @@ const corsHeaders = {
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
+// Mapping of crime types to detailed descriptions
+const descriptions = {
+  "abuse": "The detected video may involve abuse-related actions.\nAbuse can be verbal, emotional, or physical.\nIt often includes intentional harm inflicted on a victim.\nThe victim may display distress or defensive behavior.\nThere might be aggressive body language or shouting.",
+  "assault": "Assault involves a physical attack or aggressive encounter.\nThis may include punching, kicking, or pushing actions.\nThe victim may be seen retreating or being overpowered.\nThere is usually a visible conflict or threat present.\nSuch behavior is dangerous and potentially life-threatening.",
+  "arson": "This video likely captures an incident of arson.\nArson is the criminal act of intentionally setting fire.\nYou may see flames, smoke, or ignition devices.\nOften, it targets property like buildings or vehicles.\nArson can lead to massive destruction and danger to life.",
+  "arrest": "The scene likely depicts a law enforcement arrest.\nAn arrest involves restraining a suspect or individual.\nYou may see officers using handcuffs or other tools.\nThe individual may be cooperating or resisting.\nIt could be in public or private settings."
+};
+
+// Function to try connecting to local FastAPI model if available
+async function tryLocalModel(videoUrl: string): Promise<any | null> {
+  try {
+    const localModelUrl = "http://localhost:8000/analyze-video";
+    const response = await fetch(localModelUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ video_url: videoUrl }),
+      // Short timeout to fail fast if local model isn't running
+      signal: AbortSignal.timeout(2000)
+    });
+    
+    if (response.ok) {
+      return await response.json();
+    }
+    
+    return null;
+  } catch (error) {
+    console.log("Local model not available, using fallback:", error);
+    return null;
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -31,35 +62,56 @@ serve(async (req) => {
     // Create a Supabase client with the Admin key to have full access
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Simulate AI analysis
-    // In a production environment, you would connect to a real AI model here
-    const crimeTypes = ["abuse", "assault", "arson", "arrest"];
-    const randomIndex = Math.floor(Math.random() * crimeTypes.length);
-    const crimeType = crimeTypes[randomIndex];
-    const confidence = 0.75 + (Math.random() * 0.20); // Between 0.75 and 0.95
+    // Try to use local FastAPI model if available
+    let modelResult = await tryLocalModel(videoUrl);
     
-    // Import descriptions from our helper file
-    const descriptions = {
-      "abuse": "The detected video may involve abuse-related actions.\nAbuse can be verbal, emotional, or physical.\nIt often includes intentional harm inflicted on a victim.\nThe victim may display distress or defensive behavior.\nThere might be aggressive body language or shouting.",
-      "assault": "Assault involves a physical attack or aggressive encounter.\nThis may include punching, kicking, or pushing actions.\nThe victim may be seen retreating or being overpowered.\nThere is usually a visible conflict or threat present.\nSuch behavior is dangerous and potentially life-threatening.",
-      "arson": "This video likely captures an incident of arson.\nArson is the criminal act of intentionally setting fire.\nYou may see flames, smoke, or ignition devices.\nOften, it targets property like buildings or vehicles.\nArson can lead to massive destruction and danger to life.",
-      "arrest": "The scene likely depicts a law enforcement arrest.\nAn arrest involves restraining a suspect or individual.\nYou may see officers using handcuffs or other tools.\nThe individual may be cooperating or resisting.\nIt could be in public or private settings."
-    };
-    
-    const description = descriptions[crimeType as keyof typeof descriptions] || 
-      "The video content requires further investigation.";
+    // If local model fails or isn't available, use fallback simulation
+    if (!modelResult) {
+      // Simulate AI analysis
+      // In a production environment, you would connect to a real AI model here
+      const crimeTypes = ["abuse", "assault", "arson", "arrest"];
+      const randomIndex = Math.floor(Math.random() * crimeTypes.length);
+      const crimeType = crimeTypes[randomIndex];
+      const confidence = 0.75 + (Math.random() * 0.20); // Between 0.75 and 0.95
+      
+      modelResult = {
+        crime_type: crimeType,
+        confidence: confidence,
+        description: descriptions[crimeType as keyof typeof descriptions]
+      };
+    }
     
     const analysisResult = {
-      crimeType,
-      confidence,
-      description,
+      crimeType: modelResult.crime_type,
+      confidence: modelResult.confidence,
+      description: modelResult.description || descriptions[modelResult.crime_type as keyof typeof descriptions],
       analysisTimestamp: new Date().toISOString()
     };
     
     console.log("Analysis complete:", analysisResult);
     
-    // In a real scenario, you might want to store this analysis result in your database
-    // For now, we'll just return the result
+    // If we have a reportId, store the analysis in the database
+    if (reportId) {
+      const { error } = await supabase
+        .from('crime_report_analysis')
+        .upsert({
+          report_id: reportId,
+          crime_type: analysisResult.crimeType,
+          confidence: analysisResult.confidence,
+          description: analysisResult.description,
+          model_version: 'v1.0'
+        });
+      
+      if (error) {
+        console.error("Error storing analysis in database:", error);
+      } else {
+        // Update the queue status
+        await supabase
+          .from('video_analysis_queue')
+          .update({ status: 'completed', processed_at: new Date().toISOString() })
+          .eq('report_id', reportId);
+      }
+    }
     
     return new Response(
       JSON.stringify({ 

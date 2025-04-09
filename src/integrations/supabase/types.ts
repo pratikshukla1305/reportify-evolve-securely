@@ -102,6 +102,44 @@ export type Database = {
         }
         Relationships: []
       }
+      crime_report_analysis: {
+        Row: {
+          confidence: number
+          created_at: string
+          crime_type: string
+          description: string
+          id: string
+          model_version: string | null
+          report_id: string | null
+        }
+        Insert: {
+          confidence: number
+          created_at?: string
+          crime_type: string
+          description: string
+          id?: string
+          model_version?: string | null
+          report_id?: string | null
+        }
+        Update: {
+          confidence?: number
+          created_at?: string
+          crime_type?: string
+          description?: string
+          id?: string
+          model_version?: string | null
+          report_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crime_report_analysis_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: true
+            referencedRelation: "crime_reports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       crime_reports: {
         Row: {
           description: string | null
@@ -497,6 +535,51 @@ export type Database = {
           voice_recording?: string | null
         }
         Relationships: []
+      }
+      video_analysis_queue: {
+        Row: {
+          created_at: string
+          evidence_id: string | null
+          id: string
+          processed_at: string | null
+          report_id: string | null
+          status: string | null
+          video_url: string
+        }
+        Insert: {
+          created_at?: string
+          evidence_id?: string | null
+          id?: string
+          processed_at?: string | null
+          report_id?: string | null
+          status?: string | null
+          video_url: string
+        }
+        Update: {
+          created_at?: string
+          evidence_id?: string | null
+          id?: string
+          processed_at?: string | null
+          report_id?: string | null
+          status?: string | null
+          video_url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_analysis_queue_evidence_id_fkey"
+            columns: ["evidence_id"]
+            isOneToOne: false
+            referencedRelation: "evidence"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_analysis_queue_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "crime_reports"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       voice_recordings: {
         Row: {

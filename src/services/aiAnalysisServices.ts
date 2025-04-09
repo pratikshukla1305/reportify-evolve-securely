@@ -1,6 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { crimeDescriptions, getCrimeDescriptionByType } from './crimeAnalysisData';
 
 export type VideoAnalysisResult = {
   crimeType: string;
@@ -23,6 +24,24 @@ export type AnalysisResponse = {
  */
 export const analyzeVideoEvidence = async (videoUrl: string, reportId?: string): Promise<AnalysisResponse> => {
   try {
+    // First, check if this video has already been analyzed
+    if (reportId) {
+      const existingAnalysis = await getReportAnalysis(reportId);
+      if (existingAnalysis) {
+        return { success: true, analysis: existingAnalysis };
+      }
+    }
+    
+    // If not previously analyzed, queue it for analysis
+    if (reportId) {
+      await supabase.from('video_analysis_queue').insert({
+        report_id: reportId,
+        video_url: videoUrl,
+        status: 'processing'
+      });
+    }
+    
+    // Call the edge function to analyze the video
     const { data, error } = await supabase.functions.invoke('analyze-video-evidence', {
       body: { videoUrl, reportId }
     });
@@ -38,6 +57,17 @@ export const analyzeVideoEvidence = async (videoUrl: string, reportId?: string):
       return { success: false, error: data.error };
     }
     
+    // If we have a report ID, store the analysis result in the database
+    if (reportId && data.analysis) {
+      await supabase.from('crime_report_analysis').upsert({
+        report_id: reportId,
+        crime_type: data.analysis.crimeType,
+        confidence: data.analysis.confidence,
+        description: data.analysis.description,
+        model_version: 'v1.0'
+      });
+    }
+    
     return data;
   } catch (error: any) {
     console.error("Error in analyzeVideoEvidence:", error);
@@ -47,45 +77,68 @@ export const analyzeVideoEvidence = async (videoUrl: string, reportId?: string):
 };
 
 /**
- * Get analysis result for a specific report
- * Since we don't have a crime_report_analysis table in the database schema,
- * this is a mock implementation that would normally fetch from the database.
+ * Get analysis result for a specific report from the database
  * 
  * @param reportId Report ID
  * @returns Analysis result
  */
 export const getReportAnalysis = async (reportId: string): Promise<VideoAnalysisResult | null> => {
   try {
-    // In a real implementation, we would query the database for the analysis
-    // For now, simulate getting the analysis from evidence metadata
+    // Query the crime_report_analysis table for this report
     const { data, error } = await supabase
-      .from('evidence')
+      .from('crime_report_analysis')
       .select('*')
       .eq('report_id', reportId)
-      .order('uploaded_at', { ascending: false })
-      .limit(1);
+      .single();
     
     if (error) {
+      // If the report doesn't have an analysis yet, it's not an error
+      if (error.code === 'PGRST116') { // No rows returned
+        return null;
+      }
       throw error;
     }
     
-    if (!data || data.length === 0) {
+    if (!data) {
       return null;
     }
     
-    // For demo purposes, simulate an analysis result
-    // In production, you would store and retrieve actual analysis data
-    const mockAnalysis: VideoAnalysisResult = {
-      crimeType: ['abuse', 'assault', 'arson', 'arrest'][Math.floor(Math.random() * 4)],
-      confidence: 0.75 + (Math.random() * 0.2),
-      description: "This video shows potential evidence of a crime. The AI has analyzed the content and detected suspicious activity that requires further investigation.",
-      analysisTimestamp: new Date().toISOString()
+    // Map database fields to VideoAnalysisResult
+    const result: VideoAnalysisResult = {
+      crimeType: data.crime_type,
+      confidence: Number(data.confidence),
+      description: data.description,
+      analysisTimestamp: data.created_at
     };
     
-    return mockAnalysis;
+    return result;
   } catch (error: any) {
     console.error("Error in getReportAnalysis:", error);
-    toast.error(`Failed to retrieve analysis: ${error.message}`);
+    
+    // If it's not a "no rows" error, show a toast
+    if (error.code !== 'PGRST116') {
+      toast.error(`Failed to retrieve analysis: ${error.message}`);
+    }
+    
     return null;
   }
+};
+
+/**
+ * Perform a mock analysis when no real AI model is available.
+ * This function provides realistic-looking results for demo purposes.
+ */
+export const performMockAnalysis = (videoUrl: string): VideoAnalysisResult => {
+  // Simulate AI analysis
+  const crimeTypes = ["abuse", "assault", "arson", "arrest"];
+  const randomIndex = Math.floor(Math.random() * crimeTypes.length);
+  const crimeType = crimeTypes[randomIndex];
+  const confidence = 0.75 + (Math.random() * 0.20); // Between 0.75 and 0.95
+  
+  return {
+    crimeType,
+    confidence,
+    description: getCrimeDescriptionByType(crimeType),
+    analysisTimestamp: new Date().toISOString()
+  };
 };
