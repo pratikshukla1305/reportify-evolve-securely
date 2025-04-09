@@ -24,10 +24,13 @@ export type AnalysisResponse = {
  */
 export const analyzeVideoEvidence = async (videoUrl: string, reportId?: string): Promise<AnalysisResponse> => {
   try {
+    console.log(`Starting analysis for video: ${videoUrl}, reportId: ${reportId}`);
+    
     // First, check if this video has already been analyzed
     if (reportId) {
       const existingAnalysis = await getReportAnalysis(reportId);
       if (existingAnalysis) {
+        console.log("Found existing analysis for this report:", existingAnalysis);
         return { success: true, analysis: existingAnalysis };
       }
     }
@@ -43,11 +46,15 @@ export const analyzeVideoEvidence = async (videoUrl: string, reportId?: string):
             video_url: videoUrl,
             status: 'processing'
           });
+          
+        console.log("Video queued for analysis");  
       } catch (insertError: any) {
         console.error("Error queuing analysis:", insertError);
         // Continue with analysis even if queue insert fails
       }
     }
+    
+    console.log("Calling edge function to analyze video");
     
     // Call the edge function to analyze the video
     // The edge function will attempt to use the Python model service if available
@@ -62,9 +69,12 @@ export const analyzeVideoEvidence = async (videoUrl: string, reportId?: string):
     }
     
     if (!data.success) {
+      console.error("Analysis unsuccessful:", data.error);
       toast.error(data.error || "Analysis failed");
       return { success: false, error: data.error };
     }
+    
+    console.log("Analysis completed successfully:", data);
     
     // If we have a report ID, store the analysis result in the database
     if (reportId && data.analysis) {
@@ -78,6 +88,8 @@ export const analyzeVideoEvidence = async (videoUrl: string, reportId?: string):
             description: data.analysis.description,
             model_version: 'v1.0'
           });
+          
+        console.log("Analysis stored in database");
       } catch (upsertError: any) {
         console.error("Error storing analysis:", upsertError);
         // Continue even if storage fails
@@ -100,6 +112,8 @@ export const analyzeVideoEvidence = async (videoUrl: string, reportId?: string):
  */
 export const getReportAnalysis = async (reportId: string): Promise<VideoAnalysisResult | null> => {
   try {
+    console.log(`Getting analysis for report: ${reportId}`);
+    
     // Use a safer approach with better type handling
     const { data, error } = await supabase
       .from('crime_report_analysis' as any)
@@ -110,27 +124,27 @@ export const getReportAnalysis = async (reportId: string): Promise<VideoAnalysis
     if (error) {
       // If the report doesn't have an analysis yet, it's not an error
       if (error.code === 'PGRST116') { // No rows returned
+        console.log("No analysis found for this report");
         return null;
       }
+      console.error("Error fetching report analysis:", error);
       throw error;
     }
     
     if (!data) {
+      console.log("No analysis data returned");
       return null;
     }
     
-    // Use strong type assertion and proper type checking
-    // This gives TypeScript more information about the structure
-    const rawData = data as any;
-    
-    // Create the result object with safe access patterns
+    // Type assertion with safe fallbacks
     const result: VideoAnalysisResult = {
-      crimeType: typeof rawData.crime_type === 'string' ? rawData.crime_type : '',
-      confidence: typeof rawData.confidence === 'number' ? rawData.confidence : 0,
-      description: typeof rawData.description === 'string' ? rawData.description : '',
-      analysisTimestamp: typeof rawData.created_at === 'string' ? rawData.created_at : new Date().toISOString()
+      crimeType: data.crime_type || '',
+      confidence: typeof data.confidence === 'number' ? data.confidence : 0,
+      description: data.description || '',
+      analysisTimestamp: data.created_at || new Date().toISOString()
     };
     
+    console.log("Retrieved analysis:", result);
     return result;
   } catch (error: any) {
     console.error("Error in getReportAnalysis:", error);

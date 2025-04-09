@@ -23,16 +23,25 @@ async function tryLocalModel(videoUrl: string): Promise<any | null> {
   try {
     // Configure this to point to your Python FastAPI model service
     const localModelUrl = "http://localhost:8000/analyze-video";
+    console.log(`Attempting to connect to local model at ${localModelUrl}`);
+    
     const response = await fetch(localModelUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ video_url: videoUrl }),
       // Short timeout to fail fast if local model isn't running
-      signal: AbortSignal.timeout(5000)
+      signal: AbortSignal.timeout(10000)
     });
     
     if (response.ok) {
-      return await response.json();
+      console.log("Successfully connected to local model");
+      const result = await response.json();
+      console.log("Local model response:", result);
+      return result;
+    } else {
+      console.log(`Local model returned error status: ${response.status}`);
+      const errorText = await response.text();
+      console.log(`Error response: ${errorText}`);
     }
     
     return null;
@@ -68,6 +77,8 @@ serve(async (req) => {
     
     // If local model fails or isn't available, use fallback simulation
     if (!modelResult) {
+      console.log("Using fallback model simulation");
+      
       // Simulate AI analysis
       // In a production environment, you would connect to a real AI model here
       const crimeTypes = ["abuse", "assault", "arson", "arrest"];
