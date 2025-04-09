@@ -3,15 +3,27 @@ import React, { useEffect, useState } from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
-import { Link, useNavigate } from 'react-router-dom';
-import { FileText, Edit, Download, ArrowLeft } from 'lucide-react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { FileText, Edit, Download, ArrowLeft, ShieldAlert } from 'lucide-react';
 import { toast } from 'sonner';
+import { Badge } from '@/components/ui/badge';
+import { getReportAnalysis, VideoAnalysisResult } from '@/services/aiAnalysisServices';
 
 const ViewDraftReport = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
+  const [reportId, setReportId] = useState<string | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<VideoAnalysisResult | null>(null);
   
   useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const id = searchParams.get('id');
+    if (id) {
+      setReportId(id);
+      fetchAnalysisResult(id);
+    }
+    
     const savedImages = sessionStorage.getItem('uploadedImages');
     if (savedImages) {
       setUploadedImages(JSON.parse(savedImages));
@@ -23,18 +35,44 @@ const ViewDraftReport = () => {
         "https://images.unsplash.com/photo-1594717527389-a590b56e331d?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80"
       ]);
     }
-  }, []);
+  }, [location.search]);
+  
+  const fetchAnalysisResult = async (id: string) => {
+    try {
+      const result = await getReportAnalysis(id);
+      if (result) {
+        setAnalysisResult(result);
+      }
+    } catch (error) {
+      console.error("Error fetching analysis result:", error);
+    }
+  };
   
   const handleDownloadDraft = () => {
     toast.success("Draft report downloaded successfully");
   };
   
   const handleEditReport = () => {
-    navigate("/continue-report");
+    navigate(`/continue-report${reportId ? `?id=${reportId}` : ''}`);
   };
   
   const handleGenerateFullReport = () => {
-    navigate("/generate-detailed-report");
+    navigate(`/generate-detailed-report${reportId ? `?id=${reportId}` : ''}`);
+  };
+  
+  const getCrimeTypeColor = (crimeType: string): string => {
+    switch (crimeType.toLowerCase()) {
+      case 'abuse':
+        return 'bg-orange-100 text-orange-800';
+      case 'assault':
+        return 'bg-red-100 text-red-800';
+      case 'arson':
+        return 'bg-amber-100 text-amber-800';
+      case 'arrest':
+        return 'bg-blue-100 text-blue-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
   };
 
   return (
@@ -50,7 +88,7 @@ const ViewDraftReport = () => {
                   <ArrowLeft className="h-4 w-4 mr-2" /> Back
                 </Button>
               </Link>
-              <h1 className="text-2xl sm:text-3xl font-bold">Draft Report #1042</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold">Draft Report #{reportId || '1042'}</h1>
             </div>
             
             <div className="flex items-center">
@@ -72,16 +110,45 @@ const ViewDraftReport = () => {
                 </div>
                 <div>
                   <p className="text-sm text-gray-500 mb-1">Report Type</p>
-                  <p className="font-medium">Public Disturbance</p>
+                  <p className="font-medium flex items-center">
+                    {analysisResult ? (
+                      <>
+                        <Badge className={`mr-2 ${getCrimeTypeColor(analysisResult.crimeType)} capitalize`}>
+                          {analysisResult.crimeType}
+                        </Badge>
+                        <span className="text-xs text-gray-500">
+                          {Math.round(analysisResult.confidence * 100)}% confidence
+                        </span>
+                      </>
+                    ) : (
+                      "Pending Analysis"
+                    )}
+                  </p>
                 </div>
               </div>
               
               <h3 className="text-lg font-medium mb-2">Incident Description</h3>
               <p className="text-gray-700 mb-6">
-                At approximately 8:30 PM, a group of individuals were observed vandalizing public property in 
-                the central square area. Multiple witnesses were present, and several photographs were taken 
-                of the incident in progress. The perpetrators appeared to be in their early twenties and fled 
-                the scene when approached by security personnel.
+                {analysisResult ? (
+                  <div className="bg-gray-50 p-4 rounded border border-gray-200">
+                    <div className="flex items-center mb-2">
+                      <ShieldAlert className="h-4 w-4 text-shield-blue mr-2" />
+                      <span className="font-medium">AI Analysis</span>
+                    </div>
+                    <p className="text-gray-700 whitespace-pre-line">
+                      {analysisResult.description.split('\n').slice(0, 5).join('\n')}...
+                    </p>
+                    <p className="mt-2 text-xs text-gray-500">
+                      (Full analysis available in detailed report)
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    At approximately 8:30 PM, a group of individuals were observed engaged in suspicious activity in 
+                    the central square area. Multiple witnesses were present, and several photographs were taken 
+                    of the incident in progress. Further analysis required to determine the exact nature of the activity.
+                  </>
+                )}
               </p>
               
               <h3 className="text-lg font-medium mb-2">Submitted Evidence</h3>
@@ -98,11 +165,22 @@ const ViewDraftReport = () => {
               
               <div className="border-t border-gray-200 pt-6">
                 <h3 className="text-lg font-medium mb-2">AI Analysis (Preliminary)</h3>
-                <p className="text-gray-700 italic">
-                  Initial analysis indicates the presence of 4-5 individuals engaged in defacement of public 
-                  property. Identified tools include spray paint canisters and markers. Facial recognition 
-                  is incomplete at this stage and requires further processing.
-                </p>
+                {analysisResult ? (
+                  <div className="text-gray-700">
+                    <p className="font-medium mb-2">
+                      Our AI model has identified this incident as potential{" "}
+                      <span className="capitalize">{analysisResult.crimeType}</span>{" "}
+                      with {Math.round(analysisResult.confidence * 100)}% confidence.
+                    </p>
+                    <p className="text-gray-600 text-sm italic">
+                      Generate a detailed report for complete analysis and recommendations.
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-gray-700 italic">
+                    Initial analysis is pending. Generate a detailed report to run a complete AI analysis on the provided evidence.
+                  </p>
+                )}
               </div>
             </div>
             

@@ -5,9 +5,13 @@ import { Button } from '@/components/ui/button';
 
 type DropZoneProps = {
   onFilesAdded: (files: File[]) => void;
+  acceptedFileTypes?: string;
 };
 
-const DropZone: React.FC<DropZoneProps> = ({ onFilesAdded }) => {
+const DropZone: React.FC<DropZoneProps> = ({ 
+  onFilesAdded, 
+  acceptedFileTypes = "video/*,image/*" 
+}) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
@@ -33,6 +37,8 @@ const DropZone: React.FC<DropZoneProps> = ({ onFilesAdded }) => {
     }
   };
 
+  const isVideo = acceptedFileTypes.includes('video');
+
   return (
     <div 
       className="border-2 border-dashed border-gray-200 rounded-xl p-8 text-center mb-6 hover:border-shield-blue transition-colors cursor-pointer"
@@ -43,7 +49,9 @@ const DropZone: React.FC<DropZoneProps> = ({ onFilesAdded }) => {
       <div className="mx-auto w-16 h-16 rounded-full bg-shield-blue/10 flex items-center justify-center mb-4">
         <Video className="h-8 w-8 text-shield-blue" />
       </div>
-      <p className="text-gray-600 mb-2">Drag and drop video evidence here</p>
+      <p className="text-gray-600 mb-2">
+        Drag and drop {isVideo ? "video" : "media"} evidence here
+      </p>
       <p className="text-sm text-gray-500 mb-4">or</p>
       <Button 
         variant="outline" 
@@ -53,16 +61,21 @@ const DropZone: React.FC<DropZoneProps> = ({ onFilesAdded }) => {
           handleBrowseClick();
         }}
       >
-        Browse Video Files
+        Browse Files
       </Button>
       <input
         type="file"
         ref={fileInputRef}
         className="hidden"
         multiple
-        accept="video/*"
+        accept={acceptedFileTypes}
         onChange={handleFileChange}
       />
+      {isVideo && (
+        <p className="mt-4 text-xs text-gray-500">
+          Supported formats: MP4, MOV, AVI (max 100MB)
+        </p>
+      )}
     </div>
   );
 };

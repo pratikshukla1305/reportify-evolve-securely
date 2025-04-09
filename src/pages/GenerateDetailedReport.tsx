@@ -4,9 +4,13 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { FileText, Check, RotateCcw, Download, Share2, ArrowLeft, Send } from 'lucide-react';
+import { FileText, Check, RotateCcw, Download, Share2, ArrowLeft, Send, ShieldAlert } from 'lucide-react';
 import { toast } from 'sonner';
 import { submitReportToOfficer } from '@/services/reportServices';
+import { analyzeVideoEvidence, VideoAnalysisResult } from '@/services/aiAnalysisServices';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 const GenerateDetailedReport = () => {
   const navigate = useNavigate();
@@ -16,6 +20,9 @@ const GenerateDetailedReport = () => {
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [reportId, setReportId] = useState<string | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<VideoAnalysisResult | null>(null);
+  const [analysisProgress, setAnalysisProgress] = useState(0);
+  const [analysisStep, setAnalysisStep] = useState<string>('preparing');
   
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
@@ -30,14 +37,58 @@ const GenerateDetailedReport = () => {
     }
   }, [location.search]);
   
-  const handleGenerate = () => {
+  const simulateProgress = () => {
+    let progress = 0;
+    const steps = ['preparing', 'extracting', 'analyzing', 'generating'];
+    
+    const interval = setInterval(() => {
+      progress += Math.floor(Math.random() * 5) + 1;
+      setAnalysisProgress(Math.min(progress, 100));
+      
+      if (progress >= 25 && progress < 50) {
+        setAnalysisStep(steps[1]);
+      } else if (progress >= 50 && progress < 75) {
+        setAnalysisStep(steps[2]);
+      } else if (progress >= 75 && progress < 100) {
+        setAnalysisStep(steps[3]);
+      }
+      
+      if (progress >= 100) {
+        clearInterval(interval);
+      }
+    }, 200);
+    
+    return () => clearInterval(interval);
+  };
+  
+  const handleGenerate = async () => {
     setIsGenerating(true);
-    // Simulate report generation
-    setTimeout(() => {
+    simulateProgress();
+    
+    try {
+      if (uploadedImages.length > 0 && reportId) {
+        // Use the first uploaded image/video as the source for analysis
+        const videoUrl = uploadedImages[0];
+        const result = await analyzeVideoEvidence(videoUrl, reportId);
+        
+        if (result.success && result.analysis) {
+          setAnalysisResult(result.analysis);
+          toast.success("AI analysis completed successfully!");
+        }
+      }
+      
+      // Complete the report generation after a short delay
+      setTimeout(() => {
+        setIsGenerating(false);
+        setIsComplete(true);
+        setAnalysisProgress(100);
+        toast.success("Report generated successfully!");
+      }, 3000);
+    } catch (error) {
+      console.error("Error generating report:", error);
+      toast.error("Failed to generate report. Please try again.");
       setIsGenerating(false);
-      setIsComplete(true);
-      toast.success("Report generated successfully!");
-    }, 3000);
+    }
   };
   
   const handleDownload = () => {
@@ -75,6 +126,78 @@ const GenerateDetailedReport = () => {
     }
   };
   
+  const getAnalysisStepLabel = () => {
+    switch (analysisStep) {
+      case 'preparing':
+        return 'Preparing Video Data';
+      case 'extracting':
+        return 'Extracting Video Features';
+      case 'analyzing':
+        return 'Analyzing Crime Pattern';
+      case 'generating':
+        return 'Generating AI Report';
+      default:
+        return 'Processing';
+    }
+  };
+  
+  const renderAnalysisResult = () => {
+    if (!analysisResult) return null;
+    
+    const confidencePercentage = Math.round(analysisResult.confidence * 100);
+    const crimeTypeColor = getCrimeTypeColor(analysisResult.crimeType);
+    
+    return (
+      <div className="bg-gray-50 rounded-lg p-6 mb-6 border border-gray-200">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
+          <h3 className="text-lg font-medium mb-2 sm:mb-0">AI Analysis Results</h3>
+          <Badge className={`${crimeTypeColor} capitalize`}>
+            {analysisResult.crimeType}
+          </Badge>
+        </div>
+        
+        <div className="mb-4">
+          <div className="flex justify-between mb-1 text-sm">
+            <span>Detection Confidence</span>
+            <span className="font-medium">{confidencePercentage}%</span>
+          </div>
+          <Progress value={confidencePercentage} className="h-2" />
+        </div>
+        
+        <Accordion type="single" collapsible className="w-full">
+          <AccordionItem value="description">
+            <AccordionTrigger>Crime Description</AccordionTrigger>
+            <AccordionContent>
+              <div className="whitespace-pre-line text-sm text-gray-700 bg-white p-4 rounded border border-gray-100">
+                {analysisResult.description}
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+        
+        <div className="mt-4 text-xs text-gray-500 flex items-center">
+          <ShieldAlert className="h-3 w-3 mr-1" />
+          Analysis completed on {new Date(analysisResult.analysisTimestamp).toLocaleString()}
+        </div>
+      </div>
+    );
+  };
+  
+  const getCrimeTypeColor = (crimeType: string): string => {
+    switch (crimeType.toLowerCase()) {
+      case 'abuse':
+        return 'bg-orange-100 text-orange-800';
+      case 'assault':
+        return 'bg-red-100 text-red-800';
+      case 'arson':
+        return 'bg-amber-100 text-amber-800';
+      case 'arrest':
+        return 'bg-blue-100 text-blue-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+  
   return (
     <div className="min-h-screen bg-white">
       <Navbar />
@@ -97,8 +220,8 @@ const GenerateDetailedReport = () => {
               </div>
               <h2 className="text-xl font-semibold mb-2">AI-Powered Report Generation</h2>
               <p className="text-gray-600 max-w-2xl mx-auto">
-                Our advanced AI will analyze all submitted evidence and information to create a 
-                comprehensive, detailed report ready for official use. This process ensures accuracy 
+                Our advanced AI will analyze all submitted video evidence to identify potential crimes
+                and create a comprehensive, detailed report ready for official use. This process ensures accuracy 
                 and thoroughness while saving you valuable time.
               </p>
             </div>
@@ -112,11 +235,11 @@ const GenerateDetailedReport = () => {
                 </div>
                 <div>
                   <p className="text-sm text-gray-500 mb-1">Incident Type</p>
-                  <p className="font-medium">Public Disturbance</p>
+                  <p className="font-medium">{analysisResult?.crimeType || "Under Analysis"}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-500 mb-1">Evidence Items</p>
-                  <p className="font-medium">{uploadedImages.length} Images, 1 Description</p>
+                  <p className="font-medium">{uploadedImages.length} Videos/Images, 1 Description</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-500 mb-1">Blockchain Status</p>
@@ -126,6 +249,27 @@ const GenerateDetailedReport = () => {
                 </div>
               </div>
             </div>
+            
+            {isGenerating && (
+              <div className="bg-white rounded-lg border border-gray-200 p-6 mb-8">
+                <h3 className="text-lg font-medium mb-4">AI Analysis in Progress</h3>
+                
+                <div className="mb-6">
+                  <div className="flex justify-between mb-2 text-sm">
+                    <span>{getAnalysisStepLabel()}</span>
+                    <span>{analysisProgress}%</span>
+                  </div>
+                  <Progress value={analysisProgress} className="h-2" />
+                </div>
+                
+                <div className="text-sm text-gray-600 italic">
+                  Our AI model is analyzing your video evidence for potential crime identification. 
+                  This may take a few moments.
+                </div>
+              </div>
+            )}
+            
+            {isComplete && analysisResult && renderAnalysisResult()}
             
             {!isComplete ? (
               <div className="text-center">
@@ -138,12 +282,12 @@ const GenerateDetailedReport = () => {
                   {isGenerating ? (
                     <>
                       <RotateCcw className="mr-2 h-4 w-4 animate-spin" />
-                      Generating Report...
+                      Analyzing & Generating...
                     </>
                   ) : (
                     <>
                       <FileText className="mr-2 h-4 w-4" />
-                      Generate Report
+                      Generate Report with AI Analysis
                     </>
                   )}
                 </Button>

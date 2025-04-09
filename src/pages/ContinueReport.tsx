@@ -3,16 +3,25 @@ import React, { useEffect, useState } from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { FileText, Save, X, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 
 const ContinueReport = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [reportId, setReportId] = useState<string | null>(null);
   
   useEffect(() => {
+    // Get report ID from query params
+    const searchParams = new URLSearchParams(location.search);
+    const id = searchParams.get('id');
+    if (id) {
+      setReportId(id);
+    }
+    
     const savedImages = sessionStorage.getItem('uploadedImages');
     if (savedImages) {
       setUploadedImages(JSON.parse(savedImages));
@@ -20,19 +29,19 @@ const ContinueReport = () => {
       // If no images are found, we can redirect back to upload
       toast.error("No uploaded images found");
     }
-  }, []);
+  }, [location.search]);
 
   const handleContinueEditing = () => {
     // Simulate processing
     setIsProcessing(true);
     setTimeout(() => {
       setIsProcessing(false);
-      navigate("/view-draft-report");
+      navigate(`/view-draft-report${reportId ? `?id=${reportId}` : ''}`);
     }, 1500);
   };
   
   const handleViewDraft = () => {
-    navigate("/view-draft-report");
+    navigate(`/view-draft-report${reportId ? `?id=${reportId}` : ''}`);
   };
   
   const handleCancelReport = () => {
@@ -40,7 +49,7 @@ const ContinueReport = () => {
   };
   
   const handleGenerateReport = () => {
-    navigate("/generate-detailed-report");
+    navigate(`/generate-detailed-report${reportId ? `?id=${reportId}` : ''}`);
   };
 
   return (
@@ -62,7 +71,7 @@ const ContinueReport = () => {
           
           <div className="glass-card p-8 mb-8">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-semibold">Report #1042</h2>
+              <h2 className="text-xl font-semibold">Report #{reportId || '1042'}</h2>
               <span className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">Draft</span>
             </div>
             
@@ -80,7 +89,7 @@ const ContinueReport = () => {
               
               <div className="mb-4">
                 <p className="text-sm text-gray-500 mb-1">Description</p>
-                <p className="font-medium">Incident report - {uploadedImages.length} images uploaded</p>
+                <p className="font-medium">Incident report - {uploadedImages.length} videos/images uploaded</p>
               </div>
               
               {uploadedImages.length > 0 && (
@@ -140,7 +149,7 @@ const ContinueReport = () => {
               className="bg-green-600 text-white hover:bg-green-700 transition-all"
               onClick={handleGenerateReport}
             >
-              Generate Detailed Report
+              Generate Detailed Report with AI Analysis
             </Button>
           </div>
         </div>
