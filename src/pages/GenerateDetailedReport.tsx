@@ -104,9 +104,6 @@ const GenerateDetailedReport = () => {
     try {
       const doc = new jsPDF();
       
-      const logoUrl = "https://www.reportify.app/logo.png";
-      doc.addImage(logoUrl, 'PNG', 10, 10, 50, 20);
-      
       doc.setFontSize(22);
       doc.setTextColor(0, 51, 102);
       doc.text("REPORTIFY", 105, 20, { align: "center" });
@@ -119,7 +116,7 @@ const GenerateDetailedReport = () => {
       doc.text(`Report ID: ${reportId || "Unknown"}`, 20, 50);
       doc.text(`Date: ${new Date().toLocaleDateString()}`, 20, 57);
       doc.text(`Time: ${new Date().toLocaleTimeString()}`, 20, 64);
-      doc.text(`Location: Downtown Central Square`, 20, 71);
+      doc.text(`Location: ${location || 'Not specified'}`, 20, 71);
       
       doc.setFontSize(14);
       doc.setTextColor(0, 51, 102);
@@ -162,9 +159,9 @@ const GenerateDetailedReport = () => {
       
       doc.save(`Reportify-Crime-Report-${reportId}.pdf`);
       toast.success("PDF downloaded successfully");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error generating PDF:", error);
-      toast.error("Failed to generate PDF");
+      toast.error("Failed to generate PDF. Please try again later.");
     }
   };
   

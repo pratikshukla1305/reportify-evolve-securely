@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -6,6 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { FileText, Save, X, Eye } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+
+interface ReportData {
+  description?: string;
+  location?: string;
+  title?: string;
+}
 
 const ContinueReport = () => {
   const navigate = useNavigate();
@@ -13,26 +19,43 @@ const ContinueReport = () => {
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [reportId, setReportId] = useState<string | null>(null);
+  const [reportData, setReportData] = useState<ReportData>({});
   
   useEffect(() => {
-    // Get report ID from query params
     const searchParams = new URLSearchParams(location.search);
     const id = searchParams.get('id');
     if (id) {
       setReportId(id);
+      fetchReportData(id);
     }
     
     const savedImages = sessionStorage.getItem('uploadedImages');
     if (savedImages) {
       setUploadedImages(JSON.parse(savedImages));
     } else {
-      // If no images are found, we can redirect back to upload
       toast.error("No uploaded images found");
     }
   }, [location.search]);
 
+  const fetchReportData = async (id: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('crime_reports')
+        .select('description, location, title')
+        .eq('id', id)
+        .single();
+      
+      if (error) throw error;
+      if (data) {
+        setReportData(data);
+      }
+    } catch (error) {
+      console.error('Error fetching report data:', error);
+      toast.error("Failed to load report data");
+    }
+  };
+
   const handleContinueEditing = () => {
-    // Simulate processing
     setIsProcessing(true);
     setTimeout(() => {
       setIsProcessing(false);
@@ -89,8 +112,17 @@ const ContinueReport = () => {
               
               <div className="mb-4">
                 <p className="text-sm text-gray-500 mb-1">Description</p>
-                <p className="font-medium">Incident report - {uploadedImages.length} videos/images uploaded</p>
+                <p className="font-medium">
+                  {reportData.description || 'No description provided'}
+                </p>
               </div>
+
+              {reportData.location && (
+                <div className="mb-4">
+                  <p className="text-sm text-gray-500 mb-1">Location</p>
+                  <p className="font-medium">{reportData.location}</p>
+                </div>
+              )}
               
               {uploadedImages.length > 0 && (
                 <div className="mb-4">
