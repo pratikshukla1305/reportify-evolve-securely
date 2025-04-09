@@ -123,12 +123,13 @@ export const getReportAnalysis = async (reportId: string): Promise<VideoAnalysis
       return null;
     }
     
-    // Safely extract fields from data
+    // Use optional chaining and fallbacks to access data properties safely
+    // This prevents TypeScript errors when accessing properties
     const result: VideoAnalysisResult = {
-      crimeType: data.crime_type || '',
-      confidence: Number(data.confidence) || 0,
-      description: data.description || '',
-      analysisTimestamp: data.created_at || new Date().toISOString()
+      crimeType: data?.crime_type || '',
+      confidence: typeof data?.confidence === 'number' ? data.confidence : 0,
+      description: data?.description || '',
+      analysisTimestamp: data?.created_at || new Date().toISOString()
     };
     
     return result;
