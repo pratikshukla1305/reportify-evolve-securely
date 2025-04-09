@@ -1,12 +1,57 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { AlertTriangle, X, ArrowLeft } from 'lucide-react';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 const CancelReport = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [isDeleting, setIsDeleting] = useState(false);
+  
+  // Extract report ID from query params
+  const searchParams = new URLSearchParams(location.search);
+  const reportId = searchParams.get('id');
+
+  const handleCancel = async () => {
+    if (!reportId) {
+      toast.error("No report ID found");
+      return;
+    }
+
+    setIsDeleting(true);
+    
+    try {
+      // Delete the report from the database
+      const { error } = await supabase
+        .from('crime_reports')
+        .delete()
+        .eq('id', reportId);
+      
+      if (error) throw error;
+      
+      // Clear any stored images
+      sessionStorage.removeItem('uploadedImages');
+      
+      toast.success("Report cancelled successfully");
+      
+      // Redirect to home or another appropriate page
+      setTimeout(() => {
+        navigate('/');
+      }, 1000);
+      
+    } catch (error) {
+      console.error("Error deleting report:", error);
+      toast.error("Failed to delete report");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-white">
       <Navbar />
@@ -20,7 +65,7 @@ const CancelReport = () => {
               </div>
               <h1 className="text-3xl font-bold mb-2">Cancel Report</h1>
               <p className="text-gray-600">
-                Are you sure you want to cancel this report? All unsaved progress will be lost.
+                Are you sure you want to cancel this report? All progress will be permanently lost.
               </p>
             </div>
             
@@ -32,21 +77,28 @@ const CancelReport = () => {
                 <div className="ml-3">
                   <h3 className="text-sm font-medium text-amber-800">Warning</h3>
                   <div className="mt-2 text-sm text-amber-700">
-                    <p>This action cannot be undone. Report #1042 will be permanently deleted.</p>
+                    <p>This action cannot be undone. Report {reportId ? `#${reportId}` : ''} will be permanently deleted.</p>
                   </div>
                 </div>
               </div>
             </div>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Link to="/continue-report">
-                <Button variant="outline" className="w-full border-gray-300 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-all">
-                  <ArrowLeft className="mr-2 h-4 w-4" /> Go Back
-                </Button>
-              </Link>
+              <Button 
+                variant="outline" 
+                className="w-full border-gray-300 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-all"
+                onClick={() => navigate(`/continue-report${reportId ? `?id=${reportId}` : ''}`)}
+              >
+                <ArrowLeft className="mr-2 h-4 w-4" /> Go Back
+              </Button>
               
-              <Button variant="destructive" className="w-full bg-red-500 hover:bg-red-600 transition-all">
-                <X className="mr-2 h-4 w-4" /> Yes, Cancel Report
+              <Button 
+                variant="destructive" 
+                className="w-full bg-red-500 hover:bg-red-600 transition-all"
+                onClick={handleCancel}
+                disabled={isDeleting}
+              >
+                <X className="mr-2 h-4 w-4" /> {isDeleting ? "Cancelling..." : "Yes, Cancel Report"}
               </Button>
             </div>
           </div>

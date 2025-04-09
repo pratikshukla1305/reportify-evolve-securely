@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -27,6 +28,10 @@ const ContinueReport = () => {
     if (id) {
       setReportId(id);
       fetchReportData(id);
+    } else {
+      // If no report ID is provided, redirect to home or another appropriate page
+      toast.error("No report found");
+      navigate('/');
     }
     
     const savedImages = sessionStorage.getItem('uploadedImages');
@@ -35,7 +40,7 @@ const ContinueReport = () => {
     } else {
       toast.error("No uploaded images found");
     }
-  }, [location.search]);
+  }, [location.search, navigate]);
 
   const fetchReportData = async (id: string) => {
     try {
@@ -68,12 +73,25 @@ const ContinueReport = () => {
   };
   
   const handleCancelReport = () => {
-    navigate("/cancel-report");
+    navigate(`/cancel-report${reportId ? `?id=${reportId}` : ''}`);
   };
   
   const handleGenerateReport = () => {
     navigate(`/generate-detailed-report${reportId ? `?id=${reportId}` : ''}`);
   };
+
+  // If no report ID, show a loading state
+  if (!reportId) {
+    return (
+      <div className="min-h-screen bg-white">
+        <Navbar />
+        <div className="pt-24 pb-16 text-center">
+          <p>Loading report...</p>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white">
@@ -94,7 +112,7 @@ const ContinueReport = () => {
           
           <div className="glass-card p-8 mb-8">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-semibold">Report #{reportId || '1042'}</h2>
+              <h2 className="text-xl font-semibold">Report #{reportId}</h2>
               <span className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">Draft</span>
             </div>
             
