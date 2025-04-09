@@ -49,54 +49,61 @@ export const getUserSOSAlerts = async (userId: string): Promise<SOSAlert[]> => {
 
 // KYC Verification
 export const submitKycVerification = async (verificationData: any): Promise<KycVerification[]> => {
-  // First insert the main verification data
-  const { data, error } = await supabase
-    .from('kyc_verifications')
-    .insert([{
-      full_name: verificationData.full_name,
-      email: verificationData.email,
-      submission_date: new Date().toISOString(),
-      status: 'Pending',
-      id_front: verificationData.id_front,
-      id_back: verificationData.id_back,
-      selfie: verificationData.selfie
-    }])
-    .select();
-  
-  if (error) {
-    throw error;
-  }
-  
-  // Initialize the documents array
-  const results: KycVerification[] = data.map(item => ({
-    ...item,
-    documents: []
-  }));
-  
-  // If documents are provided, store them in the kyc_documents table
-  if (verificationData.documents && verificationData.documents.length > 0) {
-    const documentsToInsert = verificationData.documents.map((doc: any) => ({
-      verification_id: data[0].id,
-      document_type: doc.type,
-      document_url: doc.url,
-      extracted_data: doc.extracted_data || null
+  try {
+    // First insert the main verification data
+    const { data, error } = await supabase
+      .from('kyc_verifications')
+      .insert([{
+        full_name: verificationData.fullName,
+        email: verificationData.email,
+        submission_date: new Date().toISOString(),
+        status: 'Pending',
+        id_front: verificationData.idFront,
+        id_back: verificationData.idBack,
+        selfie: verificationData.selfie
+      }])
+      .select();
+    
+    if (error) {
+      console.error('Error submitting KYC verification:', error);
+      throw error;
+    }
+    
+    // Initialize the documents array
+    const results: KycVerification[] = data.map(item => ({
+      ...item,
+      documents: []
     }));
     
-    const { data: docData, error: docError } = await supabase
-      .from('kyc_documents')
-      .insert(documentsToInsert)
-      .select();
+    // If documents are provided, store them in the kyc_documents table
+    if (verificationData.documents && verificationData.documents.length > 0) {
+      const documentsToInsert = verificationData.documents.map((doc: any) => ({
+        verification_id: data[0].id,
+        document_type: doc.type,
+        document_url: doc.url,
+        extracted_data: doc.extracted_data || null
+      }));
       
-    if (docError) {
-      console.error("Error saving KYC documents:", docError);
-      // Don't throw here, as the verification was already saved
-    } else if (docData) {
-      // Attach the documents to the result
-      results[0].documents = docData as KycDocument[];
+      const { data: docData, error: docError } = await supabase
+        .from('kyc_documents')
+        .insert(documentsToInsert)
+        .select();
+        
+      if (docError) {
+        console.error("Error saving KYC documents:", docError);
+        // Don't throw here, as the verification was already saved
+      } else if (docData) {
+        // Attach the documents to the result
+        results[0].documents = docData as KycDocument[];
+      }
     }
+    
+    console.log('KYC verification submitted successfully:', results);
+    return results;
+  } catch (error) {
+    console.error('Error in submitKycVerification:', error);
+    throw error;
   }
-  
-  return results;
 };
 
 export const getUserKycStatus = async (email: string): Promise<KycVerification | null> => {

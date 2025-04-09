@@ -43,7 +43,7 @@ const KycVerification = ({ userId, onComplete, formData }: KycVerificationProps)
     dob?: string;
     address?: string;
     gender?: string;
-  }>({});
+  }>({}); 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editDialogType, setEditDialogType] = useState<"idNumber" | "name" | "dob">("idNumber");
   const [editedIdNumber, setEditedIdNumber] = useState("");
@@ -407,7 +407,7 @@ const KycVerification = ({ userId, onComplete, formData }: KycVerificationProps)
             
             toast({
               title: "Photo Captured",
-              description: `${captureType === 'idFront' ? 'ID Front' : captureType === 'idBack' ? 'ID Back' : 'Selfie'} captured successfully.`
+              description: `${captureType === 'idFront' ? 'ID Front' : captureType === 'idBack' ? 'ID Back' : 'Selfie'} captured successfully.` 
             });
           }
         }, 'image/jpeg', 0.95);
@@ -435,31 +435,66 @@ const KycVerification = ({ userId, onComplete, formData }: KycVerificationProps)
     
     setIsSubmitting(true);
     
-    setTimeout(() => {
-      if (formData) {
-        addKycVerification({
-          userId,
-          name: formData.fullName,
-          email: formData.email,
-          document: idFront ? URL.createObjectURL(idFront) : '',
-          photo: selfie ? URL.createObjectURL(selfie) : '',
-          status: 'pending',
-          submissionDate: new Date().toISOString()
+    const convertFileToBase64 = (file: File): Promise<string> => {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = error => reject(error);
+      });
+    };
+
+    const submitVerification = async () => {
+      try {
+        const idFrontBase64 = idFront ? await convertFileToBase64(idFront) : '';
+        const idBackBase64 = idBack ? await convertFileToBase64(idBack) : '';
+        const selfieBase64 = selfie ? await convertFileToBase64(selfie) : '';
+        
+        const documents = [];
+        if (Object.keys(extractedData).length > 0) {
+          documents.push({
+            type: 'ID Card OCR',
+            url: idFrontBase64,
+            extracted_data: extractedData
+          });
+        }
+        
+        if (formData) {
+          const { submitKycVerification } = await import('@/services/userServices');
+          
+          await submitKycVerification({
+            fullName: formData.fullName,
+            email: formData.email,
+            idFront: idFrontBase64,
+            idBack: idBackBase64,
+            selfie: selfieBase64,
+            documents: documents
+          });
+        }
+        
+        setIsSubmitting(false);
+        setIsComplete(true);
+        
+        toast({
+          title: "Verification Submitted",
+          description: "Your identity verification has been submitted successfully.",
+        });
+        
+        if (onComplete) {
+          onComplete();
+        }
+      } catch (error) {
+        console.error('Error submitting verification:', error);
+        setIsSubmitting(false);
+        toast({
+          title: "Submission Failed",
+          description: "There was an error submitting your verification. Please try again.",
+          variant: "destructive"
         });
       }
-      
-      setIsSubmitting(false);
-      setIsComplete(true);
-      
-      toast({
-        title: "Verification Submitted",
-        description: "Your identity verification has been submitted successfully.",
-      });
-      
-      if (onComplete) {
-        onComplete();
-      }
-    }, 2000);
+    };
+    
+    submitVerification();
   };
 
   const handleEditData = () => {
@@ -525,15 +560,9 @@ const KycVerification = ({ userId, onComplete, formData }: KycVerificationProps)
                   <Button asChild variant="outline" className="flex-1">
                     <Label htmlFor="id-front" className="cursor-pointer">
                       {idFront ? (
-                        <>
-                          <Check className="mr-2 h-4 w-4" />
-                          {idFront.name}
-                        </>
+                        <><Check className="mr-2 h-4 w-4" />{idFront.name}</>
                       ) : (
-                        <>
-                          <Upload className="mr-2 h-4 w-4" />
-                          Upload ID Front
-                        </>
+                        <><Upload className="mr-2 h-4 w-4" />Upload ID Front</>
                       )}
                     </Label>
                   </Button>
@@ -664,15 +693,9 @@ const KycVerification = ({ userId, onComplete, formData }: KycVerificationProps)
                   <Button asChild variant="outline" className="flex-1">
                     <Label htmlFor="id-back" className="cursor-pointer">
                       {idBack ? (
-                        <>
-                          <Check className="mr-2 h-4 w-4" />
-                          {idBack.name}
-                        </>
+                        <><Check className="mr-2 h-4 w-4" />{idBack.name}</>
                       ) : (
-                        <>
-                          <Upload className="mr-2 h-4 w-4" />
-                          Upload ID Back
-                        </>
+                        <><Upload className="mr-2 h-4 w-4" />Upload ID Back</>
                       )}
                     </Label>
                   </Button>
@@ -719,15 +742,9 @@ const KycVerification = ({ userId, onComplete, formData }: KycVerificationProps)
                   <Button asChild variant="outline" className="flex-1">
                     <Label htmlFor="selfie" className="cursor-pointer">
                       {selfie ? (
-                        <>
-                          <Check className="mr-2 h-4 w-4" />
-                          {selfie.name}
-                        </>
+                        <><Check className="mr-2 h-4 w-4" />{selfie.name}</>
                       ) : (
-                        <>
-                          <Upload className="mr-2 h-4 w-4" />
-                          Upload Selfie
-                        </>
+                        <><Upload className="mr-2 h-4 w-4" />Upload Selfie</>
                       )}
                     </Label>
                   </Button>
