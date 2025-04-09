@@ -136,12 +136,15 @@ export const getReportAnalysis = async (reportId: string): Promise<VideoAnalysis
       return null;
     }
     
+    // Use type assertion after validating that data exists
+    const rawData = data as any;
+    
     // Type assertion with safe fallbacks
     const result: VideoAnalysisResult = {
-      crimeType: data.crime_type || '',
-      confidence: typeof data.confidence === 'number' ? data.confidence : 0,
-      description: data.description || '',
-      analysisTimestamp: data.created_at || new Date().toISOString()
+      crimeType: rawData.crime_type || '',
+      confidence: typeof rawData.confidence === 'number' ? rawData.confidence : 0,
+      description: rawData.description || '',
+      analysisTimestamp: rawData.created_at || new Date().toISOString()
     };
     
     console.log("Retrieved analysis:", result);
