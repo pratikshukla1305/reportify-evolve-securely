@@ -126,11 +126,14 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
       
       // Log the view completion
       try {
-        await supabase.from('evidence_views').insert([{
-          evidence_id: evidence.id,
-          officer_id: officer?.id,
-          view_complete: true
-        }]);
+        // Use type 'any' for now to bypass type checking
+        await supabase
+          .from('evidence_views' as any)
+          .insert([{
+            evidence_id: evidence.id,
+            officer_id: officer?.id,
+            view_complete: true
+          }] as any);
       } catch (error) {
         console.error('Error logging evidence view completion:', error);
       }
@@ -139,11 +142,14 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
       
       // Log the view start
       try {
-        await supabase.from('evidence_views').insert([{
-          evidence_id: evidence.id,
-          officer_id: officer?.id,
-          view_complete: false
-        }]);
+        // Use type 'any' for now to bypass type checking
+        await supabase
+          .from('evidence_views' as any)
+          .insert([{
+            evidence_id: evidence.id,
+            officer_id: officer?.id,
+            view_complete: false
+          }] as any);
       } catch (error) {
         console.error('Error logging evidence view start:', error);
       }
@@ -242,13 +248,15 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
         // Save the PDF
         pdf.save(filename);
         
-        // Log PDF download in database
-        await supabase.from('pdf_downloads').insert([{
-          report_id: report.id,
-          officer_id: officer?.id,
-          filename,
-          success: true
-        }]);
+        // Log PDF download in database using type assertion
+        await supabase
+          .from('pdf_downloads' as any)
+          .insert([{
+            report_id: report.id,
+            officer_id: officer?.id,
+            filename,
+            success: true
+          }] as any);
         
         toast({
           title: "PDF Generated",
@@ -257,13 +265,15 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
       } catch (error) {
         console.error("Error generating PDF:", error);
         
-        // Log failed PDF download attempt
-        await supabase.from('pdf_downloads').insert([{
-          report_id: report.id,
-          officer_id: officer?.id,
-          filename,
-          success: false
-        }]);
+        // Log failed PDF download attempt using type assertion
+        await supabase
+          .from('pdf_downloads' as any)
+          .insert([{
+            report_id: report.id,
+            officer_id: officer?.id,
+            filename,
+            success: false
+          }] as any);
         
         toast({
           title: "PDF Generation Failed",

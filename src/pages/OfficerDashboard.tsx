@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useOfficerAuth } from '@/contexts/OfficerAuthContext';
@@ -32,7 +31,6 @@ const OfficerDashboard = () => {
   const [reportsCount, setReportsCount] = useState({ total: 0, todaySubmissions: 0 });
   const [isLoading, setIsLoading] = useState(true);
   
-  // New Case dialog state
   const [newCaseDialogOpen, setNewCaseDialogOpen] = useState(false);
   const [newCase, setNewCase] = useState({
     title: '',
@@ -44,7 +42,6 @@ const OfficerDashboard = () => {
   });
   const [isSubmittingCase, setIsSubmittingCase] = useState(false);
 
-  // Get the tab parameter from URL
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
     const tab = searchParams.get('tab');
@@ -59,13 +56,11 @@ const OfficerDashboard = () => {
     }
   }, [isAuthenticated, navigate]);
 
-  // Fetch counts for dashboard cards
   useEffect(() => {
     const fetchCounts = async () => {
       try {
         setIsLoading(true);
         
-        // Fetch SOS alerts count
         const alertsData = await getSosAlerts();
         const highPriorityAlerts = alertsData.filter(alert => 
           alert.urgency_level?.toLowerCase() === 'high' && 
@@ -75,12 +70,10 @@ const OfficerDashboard = () => {
           highPriority: highPriorityAlerts
         });
 
-        // Fetch KYC verifications count
         const kycData = await getKycVerifications();
         const pendingKyc = kycData.filter(kyc => 
           kyc.status?.toLowerCase() === 'pending').length;
         
-        // Calculate last updated time
         let lastUpdated = 'N/A';
         if (kycData.length > 0) {
           const mostRecent = new Date(Math.max(...kycData.map(k => new Date(k.submission_date).getTime())));
@@ -105,17 +98,14 @@ const OfficerDashboard = () => {
           lastUpdated
         });
 
-        // Fetch reports count
         const reportsData = await getOfficerReports();
         
-        // Calculate today's submissions
         const today = new Date().toISOString().split('T')[0];
         const todaySubmissions = reportsData.filter(report => {
           const reportDate = new Date(report.report_date).toISOString().split('T')[0];
           return reportDate === today && report.status?.toLowerCase() === 'submitted';
         }).length;
 
-        // Only count non-completed reports for the total
         const activeReports = reportsData.filter(report => 
           report.status?.toLowerCase() !== 'completed').length;
 
@@ -133,16 +123,13 @@ const OfficerDashboard = () => {
 
     fetchCounts();
     
-    // Set up an interval to refresh counts every 3 minutes
     const intervalId = setInterval(fetchCounts, 3 * 60 * 1000);
     
-    // Clean up the interval
     return () => clearInterval(intervalId);
   }, []);
 
   const handleTabChange = (value: string) => {
     setActiveTab(value);
-    // Update URL without reloading page
     const searchParams = new URLSearchParams(location.search);
     searchParams.set('tab', value);
     navigate({
@@ -151,18 +138,15 @@ const OfficerDashboard = () => {
     }, { replace: true });
   };
   
-  // Handle form input changes for the new case
   const handleNewCaseInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setNewCase({ ...newCase, [name]: value });
   };
   
-  // Handle select changes for the new case
   const handleCrimeTypeChange = (value: string) => {
     setNewCase({ ...newCase, crime_type: value });
   };
   
-  // Get current location for the new case
   const getCurrentLocation = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -184,9 +168,7 @@ const OfficerDashboard = () => {
     }
   };
   
-  // Handle new case submission
   const handleSubmitNewCase = async () => {
-    // Basic validation
     if (!newCase.title || !newCase.latitude || !newCase.longitude || !newCase.crime_type) {
       toast.error("Please fill all required fields");
       return;
@@ -195,23 +177,31 @@ const OfficerDashboard = () => {
     setIsSubmittingCase(true);
     
     try {
-      // First create a new case
+      const caseNumber = `CASE-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
+      const today = new Date();
+      
       const { data: caseData, error: caseError } = await supabase
         .from('cases')
         .insert([{
-          title: newCase.title,
+          case_number: caseNumber,
           description: newCase.description,
           status: 'open',
-          created_by: officer?.id || null
+          reporter_id: officer?.id?.toString() || null,
+          region: "Default Region",
+          case_date: today.toISOString().split('T')[0],
+          case_time: today.toTimeString().split(' ')[0],
+          case_type: newCase.crime_type,
+          address: newCase.address || "Unknown Address",
+          latitude: parseFloat(newCase.latitude),
+          longitude: parseFloat(newCase.longitude)
         }])
         .select();
       
       if (caseError) throw caseError;
       
       if (caseData && caseData.length > 0) {
-        // Then add the location to crime_map_locations table
         const { error: locationError } = await supabase
-          .from('crime_map_locations')
+          .from('crime_map_locations' as any)
           .insert([{
             case_id: caseData[0].case_id,
             latitude: parseFloat(newCase.latitude),
@@ -219,14 +209,13 @@ const OfficerDashboard = () => {
             title: newCase.title,
             description: newCase.description,
             crime_type: newCase.crime_type
-          }]);
+          }] as any);
         
         if (locationError) throw locationError;
         
         toast.success("New case added successfully");
         setNewCaseDialogOpen(false);
         
-        // Reset form
         setNewCase({
           title: '',
           description: '',
@@ -236,9 +225,7 @@ const OfficerDashboard = () => {
           address: ''
         });
         
-        // Refresh if we're on the map tab
         if (activeTab === 'map') {
-          // Force re-render of the map component
           handleTabChange('map');
         }
       }
@@ -428,7 +415,6 @@ const OfficerDashboard = () => {
         </Tabs>
       </div>
       
-      {/* New Case Dialog */}
       <Dialog open={newCaseDialogOpen} onOpenChange={setNewCaseDialogOpen}>
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
