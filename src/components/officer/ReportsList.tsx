@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
 import { useToast } from '@/components/ui/use-toast';
-import { getOfficerReports, updateReportStatus } from '@/services/reportServices';
+import { getOfficerReports, updateReportStatus, logEvidenceView, logPdfDownload } from '@/services/reportServices';
 import { FileText, AlertTriangle, Clock, User, MapPin, FileCheck, FileX, Download, Eye, Video } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
@@ -165,13 +164,9 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
       
       // Log the view completion
       try {
-        await supabase
-          .from('evidence_views')
-          .insert([{
-            evidence_id: evidence.id,
-            officer_id: officer?.id,
-            view_complete: true
-          }]);
+        if (officer?.id && evidence.id) {
+          await logEvidenceView(evidence.id, officer.id.toString(), true);
+        }
       } catch (error) {
         console.error('Error logging evidence view completion:', error);
       }
@@ -180,13 +175,9 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
       
       // Log the view start
       try {
-        await supabase
-          .from('evidence_views')
-          .insert([{
-            evidence_id: evidence.id,
-            officer_id: officer?.id,
-            view_complete: false
-          }]);
+        if (officer?.id && evidence.id) {
+          await logEvidenceView(evidence.id, officer.id.toString(), false);
+        }
       } catch (error) {
         console.error('Error logging evidence view start:', error);
       }
@@ -210,6 +201,7 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
     setIsGeneratingPDF(true);
     
     try {
+      // Create new jsPDF document
       const pdf = new jsPDF();
       const filename = `shield_report_${report.id.substring(0, 8)}.pdf`;
       
@@ -225,7 +217,7 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
             if (img.complete) resolve(null);
           });
           
-          // Add Shield stamp in the center as a watermark
+          // Add Shield stamp in the center as a watermark (with opacity handled separately)
           pdf.addImage(
             shieldStampUrl,
             'PNG',
@@ -235,8 +227,8 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
             80
           );
           
-          // Adjust opacity for watermark effect
-          pdf.setGlobalAlpha(0.2);
+          // Use fillOpacity for creating transparent watermark effect
+          pdf.setFillOpacity(0.2);
           pdf.addImage(
             shieldStampUrl,
             'PNG',
@@ -245,7 +237,7 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
             80,
             80
           );
-          pdf.setGlobalAlpha(1.0);
+          pdf.setFillOpacity(1.0);
         }
         
         // Add Shield logo at the top
@@ -310,14 +302,9 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
         pdf.save(filename);
         
         // Log PDF download in database
-        await supabase
-          .from('pdf_downloads')
-          .insert([{
-            report_id: report.id,
-            officer_id: officer?.id,
-            filename,
-            success: true
-          }]);
+        if (officer?.id && report.id) {
+          await logPdfDownload(report.id, officer.id.toString(), filename, true);
+        }
         
         toast({
           title: "PDF Generated",
@@ -327,14 +314,9 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
         console.error("Error generating PDF:", error);
         
         // Log failed PDF download attempt
-        await supabase
-          .from('pdf_downloads')
-          .insert([{
-            report_id: report.id,
-            officer_id: officer?.id,
-            filename,
-            success: false
-          }]);
+        if (officer?.id && report.id) {
+          await logPdfDownload(report.id, officer.id.toString(), filename, false);
+        }
         
         toast({
           title: "PDF Generation Failed",

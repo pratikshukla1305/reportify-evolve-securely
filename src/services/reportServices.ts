@@ -112,3 +112,48 @@ export const updateReportStatus = async (reportId: string, status: string, offic
     throw error;
   }
 };
+
+// Log evidence view to database
+export const logEvidenceView = async (evidenceId: string, officerId: string | number, viewComplete: boolean) => {
+  try {
+    // Convert officerId to string if it's a number
+    const officerIdStr = officerId?.toString();
+    
+    const { error } = await supabase
+      .from('evidence_views')
+      .insert({
+        evidence_id: evidenceId,
+        officer_id: officerIdStr,
+        view_complete: viewComplete
+      });
+      
+    if (error) {
+      console.error('Error logging evidence view:', error);
+    }
+  } catch (error) {
+    console.error('Failed to log evidence view:', error);
+  }
+};
+
+// Log PDF download to database
+export const logPdfDownload = async (reportId: string, officerId: string | number, filename: string, success: boolean) => {
+  try {
+    // Convert officerId to string if it's a number
+    const officerIdStr = officerId?.toString();
+    
+    const { error } = await supabase
+      .from('pdf_downloads')
+      .insert({
+        report_id: reportId,
+        officer_id: officerIdStr,
+        filename: filename,
+        success: success
+      });
+      
+    if (error) {
+      console.error('Error logging PDF download:', error);
+    }
+  } catch (error) {
+    console.error('Failed to log PDF download:', error);
+  }
+};
