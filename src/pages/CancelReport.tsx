@@ -34,15 +34,24 @@ const CancelReport = () => {
       
       if (error) throw error;
       
+      // Delete any associated evidence
+      const { error: evidenceError } = await supabase
+        .from('evidence')
+        .delete()
+        .eq('report_id', reportId);
+      
+      if (evidenceError) {
+        console.error("Error deleting evidence:", evidenceError);
+        // Continue with the process even if evidence deletion fails
+      }
+      
       // Clear any stored images
       sessionStorage.removeItem('uploadedImages');
       
       toast.success("Report cancelled successfully");
       
       // Redirect to home or another appropriate page
-      setTimeout(() => {
-        navigate('/');
-      }, 1000);
+      navigate('/');
       
     } catch (error) {
       console.error("Error deleting report:", error);
@@ -87,9 +96,9 @@ const CancelReport = () => {
               <Button 
                 variant="outline" 
                 className="w-full border-gray-300 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-all"
-                onClick={() => navigate(`/continue-report${reportId ? `?id=${reportId}` : ''}`)}
+                onClick={() => navigate('/')}
               >
-                <ArrowLeft className="mr-2 h-4 w-4" /> Go Back
+                <ArrowLeft className="mr-2 h-4 w-4" /> Go Home
               </Button>
               
               <Button 

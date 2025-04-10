@@ -12,6 +12,7 @@ interface ReportData {
   description?: string;
   location?: string;
   title?: string;
+  updated_at?: string;
 }
 
 const ContinueReport = () => {
@@ -19,6 +20,7 @@ const ContinueReport = () => {
   const location = useLocation();
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [reportId, setReportId] = useState<string | null>(null);
   const [reportData, setReportData] = useState<ReportData>({});
   
@@ -29,7 +31,7 @@ const ContinueReport = () => {
       setReportId(id);
       fetchReportData(id);
     } else {
-      // If no report ID is provided, redirect to home or another appropriate page
+      // If no report ID is provided, redirect to home
       toast.error("No report found");
       navigate('/');
     }
@@ -37,26 +39,46 @@ const ContinueReport = () => {
     const savedImages = sessionStorage.getItem('uploadedImages');
     if (savedImages) {
       setUploadedImages(JSON.parse(savedImages));
-    } else {
-      toast.error("No uploaded images found");
     }
   }, [location.search, navigate]);
 
   const fetchReportData = async (id: string) => {
+    setIsLoading(true);
     try {
       const { data, error } = await supabase
         .from('crime_reports')
-        .select('description, location, title')
+        .select('description, location, title, updated_at')
         .eq('id', id)
         .single();
       
       if (error) throw error;
+      
       if (data) {
         setReportData(data);
+        
+        // Also fetch any images/evidence for this report
+        const { data: evidenceData, error: evidenceError } = await supabase
+          .from('evidence')
+          .select('storage_path')
+          .eq('report_id', id);
+          
+        if (!evidenceError && evidenceData && evidenceData.length > 0) {
+          const paths = evidenceData.map((item) => item.storage_path).filter(Boolean);
+          if (paths.length > 0) {
+            sessionStorage.setItem('uploadedImages', JSON.stringify(paths));
+            setUploadedImages(paths);
+          }
+        }
+      } else {
+        toast.error("Report not found");
+        navigate('/');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching report data:', error);
-      toast.error("Failed to load report data");
+      toast.error(`Failed to load report data: ${error.message}`);
+      navigate('/');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -80,13 +102,14 @@ const ContinueReport = () => {
     navigate(`/generate-detailed-report${reportId ? `?id=${reportId}` : ''}`);
   };
 
-  // If no report ID, show a loading state
-  if (!reportId) {
+  // If loading, show a loading state
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-white">
         <Navbar />
         <div className="pt-24 pb-16 text-center">
-          <p>Loading report...</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-shield-blue mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading report...</p>
         </div>
         <Footer />
       </div>
@@ -124,8 +147,19 @@ const ContinueReport = () => {
                 </div>
                 <div>
                   <p className="text-sm text-gray-500 mb-1">Last Updated</p>
-                  <p className="font-medium">{new Date().toLocaleDateString()}</p>
+                  <p className="font-medium">
+                    {reportData.updated_at 
+                      ? new Date(reportData.updated_at).toLocaleDateString() 
+                      : new Date().toLocaleDateString()}
+                  </p>
                 </div>
+              </div>
+              
+              <div className="mb-4">
+                <p className="text-sm text-gray-500 mb-1">Title</p>
+                <p className="font-medium">
+                  {reportData.title || 'No title provided'}
+                </p>
               </div>
               
               <div className="mb-4">

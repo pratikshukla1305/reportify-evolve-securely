@@ -21,15 +21,18 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
   const [officerNotes, setOfficerNotes] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
+  const [activePreview, setActivePreview] = useState<string | null>(null);
 
   const fetchReports = async () => {
     setIsLoading(true);
     try {
       const data = await getOfficerReports();
+      console.log("Fetched reports:", data);
       // Apply limit if provided
       const limitedData = limit ? data.slice(0, limit) : data;
       setReports(limitedData);
     } catch (error: any) {
+      console.error("Error fetching reports:", error);
       toast({
         title: "Error fetching reports",
         description: error.message,
@@ -76,6 +79,14 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
         return <Badge className="bg-green-500">Completed</Badge>;
       default:
         return <Badge>{status}</Badge>;
+    }
+  };
+
+  const toggleVideoPreview = (url: string) => {
+    if (activePreview === url) {
+      setActivePreview(null);
+    } else {
+      setActivePreview(url);
     }
   };
 
@@ -135,13 +146,30 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
                 <p className="text-xs font-medium text-gray-500 uppercase mb-2">Evidence</p>
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
                   {report.evidence.map((item: any, index: number) => (
-                    <div key={index} className="aspect-square bg-gray-100 rounded overflow-hidden">
+                    <div key={index} className="aspect-square bg-gray-100 rounded overflow-hidden cursor-pointer" onClick={() => toggleVideoPreview(item.storage_path)}>
                       {item.storage_path && (
-                        <img 
-                          src={item.storage_path} 
-                          alt={`Evidence ${index + 1}`} 
-                          className="w-full h-full object-cover"
-                        />
+                        item.type === 'video' || item.storage_path.toLowerCase().includes('video') || item.storage_path.toLowerCase().endsWith('.mp4') ? (
+                          <div className="relative w-full h-full">
+                            <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                              </svg>
+                            </div>
+                            {activePreview === item.storage_path && (
+                              <div className="fixed inset-0 z-50 bg-black bg-opacity-80 flex items-center justify-center p-4" onClick={(e) => {e.stopPropagation(); setActivePreview(null);}}>
+                                <div className="w-full max-w-3xl">
+                                  <video src={item.storage_path} controls autoPlay className="w-full" />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <img 
+                            src={item.storage_path} 
+                            alt={`Evidence ${index + 1}`} 
+                            className="w-full h-full object-cover"
+                          />
+                        )
                       )}
                     </div>
                   ))}
