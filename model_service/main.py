@@ -9,18 +9,19 @@ import numpy as np
 import cv2
 import time
 import requests
+import tempfile
 from typing import Optional
 import torch
-import tempfile
+import torch.nn as nn
 from PIL import Image
 from torchvision import transforms
 
 app = FastAPI(title="Crime Detection API")
 
-# Configure CORS
+# Configure CORS - Critical for web app integration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # Allow all origins for testing
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -90,8 +91,7 @@ crime_descriptions = {
 class CrimeNet(torch.nn.Module):
     def __init__(self, hidden_size=256, num_layers=1, num_classes=4, dropout=0.5):
         super(CrimeNet, self).__init__()
-        # ResNet18 feature extraction - no need to import torchvision here since we won't actually use it
-        # We'll load from scripted model instead
+        # ResNet18 feature extraction - we'll load from scripted model instead
         self.cnn = None  # Just a placeholder
         self.lstm = torch.nn.LSTM(
             input_size=512,
@@ -107,20 +107,20 @@ class CrimeNet(torch.nn.Module):
         # This won't be used since we'll load the scripted model
         pass
 
-# Initialize model and transform
+# Initialize transform for preprocessing
 transform = transforms.Compose([
     transforms.Resize((112, 112)),
     transforms.ToTensor()
 ])
 
-# Initialize your model
+# Initialize model
 def load_model():
     try:
         print("Loading crime detection model...")
         model_path = os.path.join(os.path.dirname(__file__), "crime_classifier_scripted.pt")
         if os.path.exists(model_path):
             model = torch.jit.load(model_path, map_location=torch.device('cpu'))
-            print("Model loaded successfully from script")
+            print(f"Model loaded successfully from {model_path}")
         else:
             print(f"Model file not found at {model_path}, using fallback")
             model = "model_placeholder"
@@ -205,21 +205,16 @@ def analyze_video_with_model(video_path):
         # Model prediction
         input_tensor = frames.unsqueeze(0)  # Add batch dimension
         
-        if isinstance(model, str):  # Fallback if model loading failed
-            # Simulate model output
-            crime_type = class_names[np.random.randint(0, len(class_names))]
-            confidence = np.random.uniform(0.78, 0.98)
-        else:
-            # Use actual model
-            with torch.no_grad():
-                outputs = model(input_tensor)
-                probabilities = torch.nn.functional.softmax(outputs, dim=1)
-                confidence, predicted = torch.max(probabilities, 1)
-                crime_type = class_names[predicted.item()]
-                confidence = confidence.item()
+        with torch.no_grad():
+            outputs = model(input_tensor)
+            probabilities = torch.nn.functional.softmax(outputs, dim=1)
+            confidence, predicted = torch.max(probabilities, 1)
+            crime_type = class_names[predicted.item()]
+            confidence = confidence.item()
         
         description = crime_descriptions.get(crime_type, "No detailed description available.")
         
+        print(f"Crime detected: {crime_type} with confidence {confidence:.4f}")
         return {
             "crime_type": crime_type,
             "confidence": confidence,

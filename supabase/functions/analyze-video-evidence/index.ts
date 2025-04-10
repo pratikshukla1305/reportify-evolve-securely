@@ -72,8 +72,8 @@ async function tryLocalModel(videoUrl: string): Promise<any | null> {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ video_url: videoUrl }),
-      // Short timeout to fail fast if local model isn't running
-      signal: AbortSignal.timeout(10000)
+      // Longer timeout to allow download and processing
+      signal: AbortSignal.timeout(30000)
     });
     
     if (response.ok) {

@@ -73,6 +73,7 @@ const GenerateDetailedReport = () => {
       if (uploadedImages.length > 0 && reportId) {
         console.log("Analyzing video evidence:", uploadedImages[0]);
         const videoUrl = uploadedImages[0];
+        
         const result = await analyzeVideoEvidence(videoUrl, reportId);
         
         if (result.success && result.analysis) {
@@ -81,10 +82,11 @@ const GenerateDetailedReport = () => {
           toast.success("AI analysis completed successfully!");
         } else {
           console.error("Analysis failed:", result.error);
-          toast.error(`Analysis failed: ${result.error}`);
+          toast.error(`Analysis failed: ${result.error || "Unknown error"}`);
         }
       } else {
         console.warn("No uploaded images or report ID available for analysis");
+        toast.warning("No video evidence available to analyze");
       }
       
       setTimeout(() => {
@@ -93,9 +95,9 @@ const GenerateDetailedReport = () => {
         setAnalysisProgress(100);
         toast.success("Report generated successfully!");
       }, 3000);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error generating report:", error);
-      toast.error("Failed to generate report. Please try again.");
+      toast.error("Failed to generate report: " + (error.message || "Unknown error"));
       setIsGenerating(false);
     }
   };

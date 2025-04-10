@@ -54,7 +54,7 @@ export const analyzeVideoEvidence = async (videoUrl: string, reportId?: string):
       }
     }
     
-    console.log("Calling edge function to analyze video");
+    console.log("Calling FastAPI model to analyze video");
     
     try {
       // First try to use the Python FastAPI model service
@@ -62,7 +62,7 @@ export const analyzeVideoEvidence = async (videoUrl: string, reportId?: string):
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ video_url: videoUrl }),
-        signal: AbortSignal.timeout(10000) // 10 second timeout
+        signal: AbortSignal.timeout(15000) // 15 second timeout for local model
       });
       
       if (response.ok) {
