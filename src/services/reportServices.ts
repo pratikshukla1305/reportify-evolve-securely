@@ -114,16 +114,13 @@ export const updateReportStatus = async (reportId: string, status: string, offic
 };
 
 // Log evidence view to database
-export const logEvidenceView = async (evidenceId: string, officerId: string | number, viewComplete: boolean) => {
+export const logEvidenceView = async (evidenceId: string, officerId: string, viewComplete: boolean) => {
   try {
-    // Convert officerId to string if it's a number
-    const officerIdStr = officerId?.toString();
-    
     const { error } = await supabase
       .from('evidence_views')
       .insert({
         evidence_id: evidenceId,
-        officer_id: officerIdStr,
+        officer_id: officerId,
         view_complete: viewComplete
       });
       
@@ -136,16 +133,13 @@ export const logEvidenceView = async (evidenceId: string, officerId: string | nu
 };
 
 // Log PDF download to database
-export const logPdfDownload = async (reportId: string, officerId: string | number, filename: string, success: boolean) => {
+export const logPdfDownload = async (reportId: string, officerId: string, filename: string, success: boolean) => {
   try {
-    // Convert officerId to string if it's a number
-    const officerIdStr = officerId?.toString();
-    
     const { error } = await supabase
       .from('pdf_downloads')
       .insert({
         report_id: reportId,
-        officer_id: officerIdStr,
+        officer_id: officerId,
         filename: filename,
         success: success
       });
@@ -157,3 +151,37 @@ export const logPdfDownload = async (reportId: string, officerId: string | numbe
     console.error('Failed to log PDF download:', error);
   }
 };
+
+// Helper function to add watermark to PDF
+export const addWatermarkToPdf = (pdf: any, imageUrl: string) => {
+  // Add Shield stamp in the center as a watermark
+  pdf.addImage(
+    imageUrl,
+    'PNG',
+    pdf.internal.pageSize.width / 2 - 40,
+    pdf.internal.pageSize.height / 2 - 40,
+    80,
+    80
+  );
+  
+  // For the transparent version, we need to use a different approach
+  // since setFillOpacity isn't available in all jsPDF versions
+  // We'll create a more subtle version by using lighter colors
+  const drawParams = pdf.context2d || {};
+  if (drawParams.globalAlpha !== undefined) {
+    const currentAlpha = drawParams.globalAlpha;
+    drawParams.globalAlpha = 0.2;
+    
+    pdf.addImage(
+      imageUrl,
+      'PNG',
+      pdf.internal.pageSize.width / 2 - 40,
+      pdf.internal.pageSize.height / 2 - 40,
+      80,
+      80
+    );
+    
+    drawParams.globalAlpha = currentAlpha;
+  }
+};
+

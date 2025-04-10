@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useToast } from '@/components/ui/use-toast';
-import { getOfficerReports, updateReportStatus, logEvidenceView, logPdfDownload } from '@/services/reportServices';
+import { 
+  getOfficerReports, 
+  updateReportStatus, 
+  logEvidenceView, 
+  logPdfDownload,
+  addWatermarkToPdf
+} from '@/services/reportServices';
 import { FileText, AlertTriangle, Clock, User, MapPin, FileCheck, FileX, Download, Eye, Video } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
@@ -40,13 +46,10 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
       const data = await getOfficerReports();
       console.log("Fetched reports:", data);
       
-      // Add dummy evidence for testing if needed
       if (data && data.length > 0) {
-        // Check if any report has no evidence
         const reportsWithoutEvidence = data.filter(report => !report.evidence || report.evidence.length === 0);
         
         for (const report of reportsWithoutEvidence) {
-          // Add some dummy evidence for demonstration
           report.evidence = [
             {
               id: uuidv4(),
@@ -72,16 +75,13 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
         }
       }
       
-      // Store reports in session storage for persistence
       sessionStorage.setItem('officer_reports', JSON.stringify(data));
       
-      // Apply limit if provided
       const limitedData = limit ? data.slice(0, limit) : data;
       setReports(limitedData);
     } catch (error: any) {
       console.error("Error fetching reports:", error);
       
-      // Try to get reports from session storage if API fails
       const storedReports = sessionStorage.getItem('officer_reports');
       if (storedReports) {
         const parsedReports = JSON.parse(storedReports);
@@ -106,12 +106,10 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
   useEffect(() => {
     fetchReports();
     
-    // Preload the shield stamp image
     const img = new Image();
     img.onload = () => setShieldStampLoaded(true);
     img.src = shieldStampUrl;
     
-    // Add event listener for beforeunload to ensure we don't lose reports
     const handleBeforeUnload = () => {
       sessionStorage.setItem('last_reports_view', Date.now().toString());
     };
@@ -127,7 +125,7 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
     setIsProcessing(true);
     try {
       await updateReportStatus(reportId, status, officerNotes);
-      await fetchReports(); // Refresh the reports list
+      await fetchReports();
       toast({
         title: "Status updated",
         description: `Report status changed to ${status}`,
@@ -162,7 +160,6 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
     if (activePreview === evidence.storage_path) {
       setActivePreview(null);
       
-      // Log the view completion
       try {
         if (officer?.id && evidence.id) {
           await logEvidenceView(evidence.id, officer.id.toString(), true);
@@ -173,7 +170,6 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
     } else {
       setActivePreview(evidence.storage_path);
       
-      // Log the view start
       try {
         if (officer?.id && evidence.id) {
           await logEvidenceView(evidence.id, officer.id.toString(), false);
@@ -201,46 +197,22 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
     setIsGeneratingPDF(true);
     
     try {
-      // Create new jsPDF document
       const pdf = new jsPDF();
       const filename = `shield_report_${report.id.substring(0, 8)}.pdf`;
       
       try {
-        // Add Shield stamp image instead of text watermark
         if (shieldStampLoaded) {
           const img = new Image();
           img.src = shieldStampUrl;
           
-          // Wait for image to load
           await new Promise((resolve) => {
             img.onload = resolve;
             if (img.complete) resolve(null);
           });
           
-          // Add Shield stamp in the center as a watermark (with opacity handled separately)
-          pdf.addImage(
-            shieldStampUrl,
-            'PNG',
-            pdf.internal.pageSize.width / 2 - 40,
-            pdf.internal.pageSize.height / 2 - 40,
-            80,
-            80
-          );
-          
-          // Use fillOpacity for creating transparent watermark effect
-          pdf.setFillOpacity(0.2);
-          pdf.addImage(
-            shieldStampUrl,
-            'PNG',
-            pdf.internal.pageSize.width / 2 - 40,
-            pdf.internal.pageSize.height / 2 - 40,
-            80,
-            80
-          );
-          pdf.setFillOpacity(1.0);
+          addWatermarkToPdf(pdf, shieldStampUrl);
         }
         
-        // Add Shield logo at the top
         pdf.addImage(
           shieldStampUrl,
           'PNG',
@@ -250,18 +222,15 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
           20
         );
         
-        // Add Shield name and title
         pdf.setFontSize(20);
-        pdf.setTextColor(0, 0, 128); // Navy blue color
+        pdf.setTextColor(0, 0, 128);
         pdf.text("SHIELD", 35, 20);
         pdf.setFontSize(16);
         pdf.text("Crime Report", 35, 30);
                 
-        // Reset text color for report content
         pdf.setTextColor(0, 0, 0);
         pdf.setFontSize(12);
         
-        // Report details
         pdf.text(`Report ID: ${report.id}`, 20, 50);
         pdf.text(`Status: ${report.status}`, 20, 60);
         pdf.text(`Report Date: ${format(new Date(report.report_date), 'PPP')}`, 20, 70);
@@ -288,20 +257,16 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
           pdf.text(splitNotes, 20, 160);
         }
         
-        // Add evidence count if available
         if (report.evidence && report.evidence.length > 0) {
           pdf.text(`Evidence Items: ${report.evidence.length}`, 20, 180);
         }
         
-        // Footer
         pdf.setFontSize(10);
         pdf.text("Generated by Shield Officer Portal", 80, 280);
         pdf.text(`Date: ${format(new Date(), 'PPP p')}`, 80, 285);
         
-        // Save the PDF
         pdf.save(filename);
         
-        // Log PDF download in database
         if (officer?.id && report.id) {
           await logPdfDownload(report.id, officer.id.toString(), filename, true);
         }
@@ -313,7 +278,6 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
       } catch (error) {
         console.error("Error generating PDF:", error);
         
-        // Log failed PDF download attempt
         if (officer?.id && report.id) {
           await logPdfDownload(report.id, officer.id.toString(), filename, false);
         }
@@ -411,7 +375,6 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
               </div>
             )}
             
-            {/* Video Preview Modal */}
             {activePreview && (
               <div 
                 className="fixed inset-0 z-50 bg-black bg-opacity-80 flex items-center justify-center p-4"
@@ -490,7 +453,6 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
               </Button>
             </div>
 
-            {/* Simple Report Detail View */}
             {reportDetailOpen === report.id && (
               <div className="mt-4 pt-4 border-t">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -536,7 +498,6 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
         </Card>
       ))}
 
-      {/* Update Report Status Dialog */}
       <Dialog open={selectedReport !== null} onOpenChange={(open) => !open && setSelectedReport(null)}>
         <DialogContent>
           <DialogHeader>
@@ -594,7 +555,6 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
         </DialogContent>
       </Dialog>
 
-      {/* Full Report Details Dialog */}
       <Dialog open={viewFullDetailsOpen} onOpenChange={setViewFullDetailsOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           {viewingReport && (
@@ -694,7 +654,6 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
                 </div>
               </div>
 
-              {/* Evidence section with improved video player */}
               {viewingReport.evidence && viewingReport.evidence.length > 0 && (
                 <div className="mt-8">
                   <h3 className="text-lg font-medium mb-4">Evidence ({viewingReport.evidence.length})</h3>
