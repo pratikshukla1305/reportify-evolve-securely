@@ -42,8 +42,19 @@ const NotificationBell = () => {
         
         setNotifications(data || []);
         setUnreadCount(data?.filter(n => !n.is_read).length || 0);
+        
+        // Store notifications in session storage for persistence
+        sessionStorage.setItem('officer_notifications', JSON.stringify(data || []));
       } catch (error) {
         console.error('Error fetching notifications:', error);
+        
+        // Try to load from session storage if available
+        const storedNotifications = sessionStorage.getItem('officer_notifications');
+        if (storedNotifications) {
+          const parsedNotifications = JSON.parse(storedNotifications);
+          setNotifications(parsedNotifications);
+          setUnreadCount(parsedNotifications.filter((n: Notification) => !n.is_read).length || 0);
+        }
       }
     };
 
@@ -63,6 +74,13 @@ const NotificationBell = () => {
           const newNotification = payload.new as Notification;
           setNotifications(prev => [newNotification, ...prev.slice(0, 4)]);
           setUnreadCount(prev => prev + 1);
+          
+          // Update session storage
+          const currentNotifications = JSON.parse(sessionStorage.getItem('officer_notifications') || '[]');
+          sessionStorage.setItem(
+            'officer_notifications', 
+            JSON.stringify([newNotification, ...currentNotifications.slice(0, 4)])
+          );
         }
       )
       .subscribe();
@@ -85,6 +103,13 @@ const NotificationBell = () => {
         n.id === id ? { ...n, is_read: true } : n
       ));
       setUnreadCount(prev => Math.max(0, prev - 1));
+      
+      // Update session storage
+      const currentNotifications = JSON.parse(sessionStorage.getItem('officer_notifications') || '[]');
+      const updatedNotifications = currentNotifications.map((n: Notification) => 
+        n.id === id ? { ...n, is_read: true } : n
+      );
+      sessionStorage.setItem('officer_notifications', JSON.stringify(updatedNotifications));
       
       // Navigate to the appropriate page if reportId exists
       if (reportId) {
@@ -112,6 +137,11 @@ const NotificationBell = () => {
       // Update local state
       setNotifications(notifications.map(n => ({ ...n, is_read: true })));
       setUnreadCount(0);
+      
+      // Update session storage
+      const currentNotifications = JSON.parse(sessionStorage.getItem('officer_notifications') || '[]');
+      const updatedNotifications = currentNotifications.map((n: Notification) => ({ ...n, is_read: true }));
+      sessionStorage.setItem('officer_notifications', JSON.stringify(updatedNotifications));
     } catch (error) {
       console.error('Error marking all notifications as read:', error);
     }
@@ -151,7 +181,7 @@ const NotificationBell = () => {
           )}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-80">
+      <DropdownMenuContent align="end" className="w-80 bg-white">
         <DropdownMenuLabel className="flex justify-between items-center">
           <span>Notifications</span>
           {unreadCount > 0 && (

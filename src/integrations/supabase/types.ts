@@ -102,6 +102,50 @@ export type Database = {
         }
         Relationships: []
       }
+      crime_map_locations: {
+        Row: {
+          case_id: number | null
+          created_at: string | null
+          crime_type: string
+          description: string | null
+          id: string
+          latitude: number
+          longitude: number
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          case_id?: number | null
+          created_at?: string | null
+          crime_type: string
+          description?: string | null
+          id?: string
+          latitude: number
+          longitude: number
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          case_id?: number | null
+          created_at?: string | null
+          crime_type?: string
+          description?: string | null
+          id?: string
+          latitude?: number
+          longitude?: number
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crime_map_locations_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["case_id"]
+          },
+        ]
+      }
       crime_report_analysis: {
         Row: {
           confidence: number
@@ -310,6 +354,38 @@ export type Database = {
           },
         ]
       }
+      evidence_views: {
+        Row: {
+          evidence_id: string | null
+          id: string
+          officer_id: string | null
+          view_complete: boolean
+          view_date: string
+        }
+        Insert: {
+          evidence_id?: string | null
+          id?: string
+          officer_id?: string | null
+          view_complete?: boolean
+          view_date?: string
+        }
+        Update: {
+          evidence_id?: string | null
+          id?: string
+          officer_id?: string | null
+          view_complete?: boolean
+          view_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "evidence_views_evidence_id_fkey"
+            columns: ["evidence_id"]
+            isOneToOne: false
+            referencedRelation: "evidence"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       kyc_documents: {
         Row: {
           created_at: string | null
@@ -454,6 +530,41 @@ export type Database = {
           phone_number?: string
         }
         Relationships: []
+      }
+      pdf_downloads: {
+        Row: {
+          download_date: string
+          filename: string
+          id: string
+          officer_id: string | null
+          report_id: string | null
+          success: boolean
+        }
+        Insert: {
+          download_date?: string
+          filename: string
+          id?: string
+          officer_id?: string | null
+          report_id?: string | null
+          success?: boolean
+        }
+        Update: {
+          download_date?: string
+          filename?: string
+          id?: string
+          officer_id?: string | null
+          report_id?: string | null
+          success?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pdf_downloads_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "crime_reports"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {

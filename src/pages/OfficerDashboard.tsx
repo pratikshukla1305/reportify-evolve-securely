@@ -5,7 +5,7 @@ import { useOfficerAuth } from '@/contexts/OfficerAuthContext';
 import OfficerNavbar from '@/components/officer/OfficerNavbar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Shield, UserCheck, FileWarning, Bell, AlertTriangle, Users, Map } from 'lucide-react';
+import { Shield, UserCheck, FileWarning, Bell, AlertTriangle, Users, Map, PlusCircle } from 'lucide-react';
 import SOSAlertsList from '@/components/officer/SOSAlertsList';
 import KycVerificationList from '@/components/officer/KycVerificationList';
 import OfficerCriminalPanel from '@/components/officer/OfficerCriminalPanel';
@@ -14,6 +14,13 @@ import ReportsList from '@/components/officer/ReportsList';
 import { getOfficerReports } from '@/services/reportServices';
 import { getSosAlerts, getKycVerifications } from '@/services/officerServices';
 import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { supabase } from '@/integrations/supabase/client';
 
 const OfficerDashboard = () => {
   const { officer, isAuthenticated } = useOfficerAuth();
@@ -24,6 +31,18 @@ const OfficerDashboard = () => {
   const [kycCount, setKycCount] = useState({ total: 0, lastUpdated: '' });
   const [reportsCount, setReportsCount] = useState({ total: 0, todaySubmissions: 0 });
   const [isLoading, setIsLoading] = useState(true);
+  
+  // New Case dialog state
+  const [newCaseDialogOpen, setNewCaseDialogOpen] = useState(false);
+  const [newCase, setNewCase] = useState({
+    title: '',
+    description: '',
+    latitude: '',
+    longitude: '',
+    crime_type: 'theft',
+    address: ''
+  });
+  const [isSubmittingCase, setIsSubmittingCase] = useState(false);
 
   // Get the tab parameter from URL
   useEffect(() => {
@@ -106,7 +125,7 @@ const OfficerDashboard = () => {
         });
       } catch (error) {
         console.error("Error fetching counts:", error);
-        toast("Error fetching dashboard data");
+        toast.error("Error fetching dashboard data");
       } finally {
         setIsLoading(false);
       }
@@ -130,6 +149,105 @@ const OfficerDashboard = () => {
       pathname: location.pathname,
       search: searchParams.toString()
     }, { replace: true });
+  };
+  
+  // Handle form input changes for the new case
+  const handleNewCaseInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setNewCase({ ...newCase, [name]: value });
+  };
+  
+  // Handle select changes for the new case
+  const handleCrimeTypeChange = (value: string) => {
+    setNewCase({ ...newCase, crime_type: value });
+  };
+  
+  // Get current location for the new case
+  const getCurrentLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setNewCase({
+            ...newCase,
+            latitude: position.coords.latitude.toString(),
+            longitude: position.coords.longitude.toString()
+          });
+          toast.success("Current location detected");
+        },
+        (error) => {
+          console.error("Error getting location:", error);
+          toast.error("Could not detect location. Please enter coordinates manually.");
+        }
+      );
+    } else {
+      toast.error("Geolocation is not supported by this browser");
+    }
+  };
+  
+  // Handle new case submission
+  const handleSubmitNewCase = async () => {
+    // Basic validation
+    if (!newCase.title || !newCase.latitude || !newCase.longitude || !newCase.crime_type) {
+      toast.error("Please fill all required fields");
+      return;
+    }
+    
+    setIsSubmittingCase(true);
+    
+    try {
+      // First create a new case
+      const { data: caseData, error: caseError } = await supabase
+        .from('cases')
+        .insert([{
+          title: newCase.title,
+          description: newCase.description,
+          status: 'open',
+          created_by: officer?.id || null
+        }])
+        .select();
+      
+      if (caseError) throw caseError;
+      
+      if (caseData && caseData.length > 0) {
+        // Then add the location to crime_map_locations table
+        const { error: locationError } = await supabase
+          .from('crime_map_locations')
+          .insert([{
+            case_id: caseData[0].case_id,
+            latitude: parseFloat(newCase.latitude),
+            longitude: parseFloat(newCase.longitude),
+            title: newCase.title,
+            description: newCase.description,
+            crime_type: newCase.crime_type
+          }]);
+        
+        if (locationError) throw locationError;
+        
+        toast.success("New case added successfully");
+        setNewCaseDialogOpen(false);
+        
+        // Reset form
+        setNewCase({
+          title: '',
+          description: '',
+          latitude: '',
+          longitude: '',
+          crime_type: 'theft',
+          address: ''
+        });
+        
+        // Refresh if we're on the map tab
+        if (activeTab === 'map') {
+          // Force re-render of the map component
+          handleTabChange('map');
+        }
+      }
+    } catch (error) {
+      console.error("Error adding new case:", error);
+      toast.error("Failed to add new case");
+    } finally {
+      setIsSubmittingCase(false);
+    }
   };
 
   return (
@@ -284,11 +402,20 @@ const OfficerDashboard = () => {
             
             <TabsContent value="map">
               <Card>
-                <CardHeader>
-                  <CardTitle>Crime Map</CardTitle>
-                  <CardDescription>
-                    View geographical distribution of crime reports
-                  </CardDescription>
+                <CardHeader className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
+                  <div>
+                    <CardTitle>Crime Map</CardTitle>
+                    <CardDescription>
+                      View geographical distribution of crime reports
+                    </CardDescription>
+                  </div>
+                  <Button 
+                    className="mt-2 sm:mt-0 bg-shield-blue hover:bg-blue-700"
+                    onClick={() => setNewCaseDialogOpen(true)}
+                  >
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Add New Case
+                  </Button>
                 </CardHeader>
                 <CardContent className="p-0">
                   <div className="h-[500px]">
@@ -300,6 +427,124 @@ const OfficerDashboard = () => {
           </div>
         </Tabs>
       </div>
+      
+      {/* New Case Dialog */}
+      <Dialog open={newCaseDialogOpen} onOpenChange={setNewCaseDialogOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Add New Case to Crime Map</DialogTitle>
+            <DialogDescription>
+              Enter the details of the crime case to add it to the map.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-1 gap-2">
+              <Label htmlFor="title">Case Title *</Label>
+              <Input
+                id="title"
+                name="title"
+                value={newCase.title}
+                onChange={handleNewCaseInputChange}
+                placeholder="Enter case title"
+                required
+              />
+            </div>
+            
+            <div className="grid grid-cols-1 gap-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                name="description"
+                value={newCase.description}
+                onChange={handleNewCaseInputChange}
+                placeholder="Enter case description"
+                className="min-h-[100px]"
+              />
+            </div>
+            
+            <div className="grid grid-cols-1 gap-2">
+              <Label htmlFor="crimeType">Crime Type *</Label>
+              <Select 
+                value={newCase.crime_type} 
+                onValueChange={handleCrimeTypeChange}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select crime type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="theft">Theft</SelectItem>
+                  <SelectItem value="assault">Assault</SelectItem>
+                  <SelectItem value="burglary">Burglary</SelectItem>
+                  <SelectItem value="robbery">Robbery</SelectItem>
+                  <SelectItem value="vandalism">Vandalism</SelectItem>
+                  <SelectItem value="fraud">Fraud</SelectItem>
+                  <SelectItem value="drug_related">Drug Related</SelectItem>
+                  <SelectItem value="homicide">Homicide</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="latitude">Latitude *</Label>
+                <Input
+                  id="latitude"
+                  name="latitude"
+                  value={newCase.latitude}
+                  onChange={handleNewCaseInputChange}
+                  placeholder="Enter latitude"
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="longitude">Longitude *</Label>
+                <Input
+                  id="longitude"
+                  name="longitude"
+                  onChange={handleNewCaseInputChange}
+                  value={newCase.longitude}
+                  placeholder="Enter longitude"
+                  required
+                />
+              </div>
+            </div>
+            
+            <div className="flex justify-end">
+              <Button 
+                variant="outline" 
+                onClick={getCurrentLocation}
+                type="button"
+              >
+                Get Current Location
+              </Button>
+            </div>
+            
+            <div className="grid grid-cols-1 gap-2">
+              <Label htmlFor="address">Address (Optional)</Label>
+              <Input
+                id="address"
+                name="address"
+                value={newCase.address}
+                onChange={handleNewCaseInputChange}
+                placeholder="Enter address"
+              />
+            </div>
+          </div>
+          
+          <DialogFooter className="flex space-x-2 justify-end">
+            <Button variant="outline" onClick={() => setNewCaseDialogOpen(false)}>Cancel</Button>
+            <Button 
+              onClick={handleSubmitNewCase}
+              disabled={isSubmittingCase}
+              className="bg-shield-blue hover:bg-blue-700"
+            >
+              {isSubmittingCase ? "Adding..." : "Add to Map"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

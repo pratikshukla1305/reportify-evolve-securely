@@ -10,6 +10,10 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { format } from 'date-fns';
 import jsPDF from 'jspdf';
+import { supabase } from '@/integrations/supabase/client';
+import { useOfficerAuth } from '@/contexts/OfficerAuthContext';
+import { v4 as uuidv4 } from 'uuid';
+import { toast } from 'sonner';
 
 interface ReportsListProps {
   limit?: number;
@@ -26,22 +30,41 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
   const [reportDetailOpen, setReportDetailOpen] = useState<string | null>(null);
   const [viewFullDetailsOpen, setViewFullDetailsOpen] = useState(false);
   const [viewingReport, setViewingReport] = useState<any | null>(null);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const { officer } = useOfficerAuth();
 
   const fetchReports = async () => {
     setIsLoading(true);
     try {
       const data = await getOfficerReports();
       console.log("Fetched reports:", data);
+      
+      // Store reports in session storage for persistence
+      sessionStorage.setItem('officer_reports', JSON.stringify(data));
+      
       // Apply limit if provided
       const limitedData = limit ? data.slice(0, limit) : data;
       setReports(limitedData);
     } catch (error: any) {
       console.error("Error fetching reports:", error);
-      toast({
-        title: "Error fetching reports",
-        description: error.message,
-        variant: "destructive",
-      });
+      
+      // Try to get reports from session storage if API fails
+      const storedReports = sessionStorage.getItem('officer_reports');
+      if (storedReports) {
+        const parsedReports = JSON.parse(storedReports);
+        const limitedData = limit ? parsedReports.slice(0, limit) : parsedReports;
+        setReports(limitedData);
+        toast({
+          title: "Using cached reports",
+          description: "Using previously loaded reports due to connection issues.",
+        });
+      } else {
+        toast({
+          title: "Error fetching reports",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -49,6 +72,17 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
 
   useEffect(() => {
     fetchReports();
+    
+    // Add event listener for beforeunload to ensure we don't lose reports
+    const handleBeforeUnload = () => {
+      sessionStorage.setItem('last_reports_view', Date.now().toString());
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
   }, [limit]);
 
   const handleStatusChange = async (reportId: string, status: string) => {
@@ -86,11 +120,33 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
     }
   };
 
-  const toggleVideoPreview = (url: string) => {
-    if (activePreview === url) {
+  const toggleVideoPreview = async (evidence: any) => {
+    if (activePreview === evidence.storage_path) {
       setActivePreview(null);
+      
+      // Log the view completion
+      try {
+        await supabase.from('evidence_views').insert([{
+          evidence_id: evidence.id,
+          officer_id: officer?.id,
+          view_complete: true
+        }]);
+      } catch (error) {
+        console.error('Error logging evidence view completion:', error);
+      }
     } else {
-      setActivePreview(url);
+      setActivePreview(evidence.storage_path);
+      
+      // Log the view start
+      try {
+        await supabase.from('evidence_views').insert([{
+          evidence_id: evidence.id,
+          officer_id: officer?.id,
+          view_complete: false
+        }]);
+      } catch (error) {
+        console.error('Error logging evidence view start:', error);
+      }
     }
   };
 
@@ -107,77 +163,117 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
     setViewFullDetailsOpen(true);
   };
 
-  const generatePdf = (report: any) => {
-    const pdf = new jsPDF();
+  const generatePdf = async (report: any) => {
+    setIsGeneratingPDF(true);
     
-    // Add Shield logo at the top
-    const logoUrl = "/favicon.ico"; // Using the favicon as the logo
-    const img = new Image();
-    img.onload = function() {
-      pdf.addImage(img, 'PNG', 10, 10, 20, 20);
+    try {
+      const pdf = new jsPDF();
+      const filename = `shield_report_${report.id.substring(0, 8)}.pdf`;
       
-      // Add Shield name and title
-      pdf.setFontSize(20);
-      pdf.setTextColor(0, 0, 128); // Navy blue color
-      pdf.text("SHIELD", 35, 20);
-      pdf.setFontSize(16);
-      pdf.text("Crime Report", 35, 30);
+      // Create a promise to handle image loading
+      const loadImage = () => {
+        return new Promise<HTMLImageElement>((resolve) => {
+          const img = new Image();
+          img.crossOrigin = "Anonymous";
+          img.onload = () => resolve(img);
+          img.src = "/favicon.ico";
+        });
+      };
       
-      // Add official stamp-like watermark
-      pdf.setTextColor(200, 200, 200); // Light gray
-      pdf.setFontSize(60);
-      pdf.text("SHIELD", 65, 150, { angle: 45 });
-      
-      // Reset text color for report content
-      pdf.setTextColor(0, 0, 0);
-      pdf.setFontSize(12);
-      
-      // Report details
-      pdf.text(`Report ID: ${report.id}`, 20, 50);
-      pdf.text(`Status: ${report.status}`, 20, 60);
-      pdf.text(`Report Date: ${format(new Date(report.report_date), 'PPP')}`, 20, 70);
-      
-      if (report.incident_date) {
-        pdf.text(`Incident Date: ${format(new Date(report.incident_date), 'PPP')}`, 20, 80);
+      try {
+        const img = await loadImage();
+        
+        // Add Shield logo at the top
+        pdf.addImage(img, 'PNG', 10, 10, 20, 20);
+        
+        // Add Shield name and title
+        pdf.setFontSize(20);
+        pdf.setTextColor(0, 0, 128); // Navy blue color
+        pdf.text("SHIELD", 35, 20);
+        pdf.setFontSize(16);
+        pdf.text("Crime Report", 35, 30);
+        
+        // Add official stamp-like watermark
+        pdf.setTextColor(200, 200, 200); // Light gray
+        pdf.setFontSize(60);
+        pdf.text("SHIELD", 65, 150, { angle: 45 });
+        
+        // Reset text color for report content
+        pdf.setTextColor(0, 0, 0);
+        pdf.setFontSize(12);
+        
+        // Report details
+        pdf.text(`Report ID: ${report.id}`, 20, 50);
+        pdf.text(`Status: ${report.status}`, 20, 60);
+        pdf.text(`Report Date: ${format(new Date(report.report_date), 'PPP')}`, 20, 70);
+        
+        if (report.incident_date) {
+          pdf.text(`Incident Date: ${format(new Date(report.incident_date), 'PPP')}`, 20, 80);
+        }
+        
+        if (report.location) {
+          pdf.text(`Location: ${report.location}`, 20, 90);
+        }
+        
+        pdf.text(`Title: ${report.title || 'Untitled Report'}`, 20, 100);
+        
+        if (report.description) {
+          pdf.text("Description:", 20, 110);
+          const splitDesc = pdf.splitTextToSize(report.description, 170);
+          pdf.text(splitDesc, 20, 120);
+        }
+        
+        if (report.officer_notes) {
+          pdf.text("Officer Notes:", 20, 150);
+          const splitNotes = pdf.splitTextToSize(report.officer_notes, 170);
+          pdf.text(splitNotes, 20, 160);
+        }
+        
+        // Add evidence count if available
+        if (report.evidence && report.evidence.length > 0) {
+          pdf.text(`Evidence Items: ${report.evidence.length}`, 20, 180);
+        }
+        
+        // Footer
+        pdf.setFontSize(10);
+        pdf.text("Generated by Shield Officer Portal", 80, 280);
+        pdf.text(`Date: ${format(new Date(), 'PPP p')}`, 80, 285);
+        
+        // Save the PDF
+        pdf.save(filename);
+        
+        // Log PDF download in database
+        await supabase.from('pdf_downloads').insert([{
+          report_id: report.id,
+          officer_id: officer?.id,
+          filename,
+          success: true
+        }]);
+        
+        toast({
+          title: "PDF Generated",
+          description: "Report PDF has been downloaded to your device",
+        });
+      } catch (error) {
+        console.error("Error generating PDF:", error);
+        
+        // Log failed PDF download attempt
+        await supabase.from('pdf_downloads').insert([{
+          report_id: report.id,
+          officer_id: officer?.id,
+          filename,
+          success: false
+        }]);
+        
+        toast({
+          title: "PDF Generation Failed",
+          description: "Could not generate PDF. Please try again.",
+          variant: "destructive"
+        });
       }
-      
-      if (report.location) {
-        pdf.text(`Location: ${report.location}`, 20, 90);
-      }
-      
-      pdf.text(`Title: ${report.title || 'Untitled Report'}`, 20, 100);
-      
-      if (report.description) {
-        pdf.text("Description:", 20, 110);
-        const splitDesc = pdf.splitTextToSize(report.description, 170);
-        pdf.text(splitDesc, 20, 120);
-      }
-      
-      if (report.officer_notes) {
-        pdf.text("Officer Notes:", 20, 150);
-        const splitNotes = pdf.splitTextToSize(report.officer_notes, 170);
-        pdf.text(splitNotes, 20, 160);
-      }
-      
-      // Add evidence count if available
-      if (report.evidence && report.evidence.length > 0) {
-        pdf.text(`Evidence Items: ${report.evidence.length}`, 20, 180);
-      }
-      
-      // Footer
-      pdf.setFontSize(10);
-      pdf.text("Generated by Shield Officer Portal", 80, 280);
-      pdf.text(`Date: ${format(new Date(), 'PPP p')}`, 80, 285);
-      
-      // Save the PDF
-      pdf.save(`shield_report_${report.id}.pdf`);
-    };
-    img.src = logoUrl;
-    
-    toast({
-      title: "PDF Generated",
-      description: "Report PDF has been downloaded",
-    });
+    } finally {
+      setIsGeneratingPDF(false);
+    }
   };
 
   if (isLoading) {
@@ -236,22 +332,17 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
                 <p className="text-xs font-medium text-gray-500 uppercase mb-2">Evidence</p>
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
                   {report.evidence.map((item: any, index: number) => (
-                    <div key={index} className="aspect-square bg-gray-100 rounded overflow-hidden cursor-pointer" onClick={() => toggleVideoPreview(item.storage_path)}>
+                    <div 
+                      key={index} 
+                      className="aspect-square bg-gray-100 rounded overflow-hidden cursor-pointer relative" 
+                      onClick={() => toggleVideoPreview(item)}
+                    >
                       {item.storage_path && (
                         item.type === 'video' || item.storage_path.toLowerCase().includes('video') || item.storage_path.toLowerCase().endsWith('.mp4') ? (
                           <div className="relative w-full h-full">
                             <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" viewBox="0 0 20 20" fill="currentColor">
-                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
-                              </svg>
+                              <Video className="h-8 w-8 text-white" />
                             </div>
-                            {activePreview === item.storage_path && (
-                              <div className="fixed inset-0 z-50 bg-black bg-opacity-80 flex items-center justify-center p-4" onClick={(e) => {e.stopPropagation(); setActivePreview(null);}}>
-                                <div className="w-full max-w-3xl">
-                                  <video src={item.storage_path} controls autoPlay className="w-full" />
-                                </div>
-                              </div>
-                            )}
                           </div>
                         ) : (
                           <img 
@@ -263,6 +354,32 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
                       )}
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+            
+            {/* Video Preview Modal */}
+            {activePreview && (
+              <div 
+                className="fixed inset-0 z-50 bg-black bg-opacity-80 flex items-center justify-center p-4"
+                onClick={() => setActivePreview(null)}
+              >
+                <div className="w-full max-w-3xl" onClick={(e) => e.stopPropagation()}>
+                  <video 
+                    src={activePreview} 
+                    controls 
+                    autoPlay 
+                    className="w-full rounded-lg shadow-lg" 
+                  />
+                  <div className="flex justify-end mt-4">
+                    <Button 
+                      variant="secondary" 
+                      className="bg-white text-black"
+                      onClick={() => setActivePreview(null)}
+                    >
+                      Close Preview
+                    </Button>
+                  </div>
                 </div>
               </div>
             )}
@@ -313,9 +430,10 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
                 variant="outline"
                 className="border-purple-500 text-purple-600 hover:bg-purple-50"
                 onClick={() => generatePdf(report)}
+                disabled={isGeneratingPDF}
               >
                 <Download className="mr-1 h-4 w-4" />
-                Download PDF
+                {isGeneratingPDF ? "Generating..." : "Download PDF"}
               </Button>
             </div>
 
@@ -499,9 +617,10 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
                       variant="outline" 
                       className="border-purple-500 text-purple-600 hover:bg-purple-50"
                       onClick={() => generatePdf(viewingReport)}
+                      disabled={isGeneratingPDF}
                     >
                       <Download className="mr-1 h-4 w-4" />
-                      Download PDF
+                      {isGeneratingPDF ? "Generating..." : "Download PDF"}
                     </Button>
                     
                     {viewingReport.status !== 'completed' && (
@@ -522,7 +641,7 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
                 </div>
               </div>
 
-              {/* Evidence section */}
+              {/* Evidence section with improved video player */}
               {viewingReport.evidence && viewingReport.evidence.length > 0 && (
                 <div className="mt-8">
                   <h3 className="text-lg font-medium mb-4">Evidence ({viewingReport.evidence.length})</h3>

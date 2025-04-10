@@ -67,13 +67,13 @@ const OfficerNavbar = () => {
   };
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-shield-dark text-white shadow-md">
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-200 shadow-sm text-gray-800">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link to="/officer-dashboard" className="flex items-center space-x-2">
-            <Shield className="h-6 w-6" />
-            <span className="font-bold text-xl">Shield</span>
+            <Shield className="h-6 w-6 text-shield-blue" />
+            <span className="font-bold text-xl text-shield-blue">Shield</span>
           </Link>
 
           {/* Desktop Navigation */}
@@ -82,8 +82,8 @@ const OfficerNavbar = () => {
               <Button
                 key={index}
                 variant="ghost"
-                className={`hover:bg-shield-dark-hover ${
-                  isActiveRoute(item.path) ? 'bg-shield-dark-hover' : ''
+                className={`hover:bg-gray-100/80 text-gray-800 ${
+                  isActiveRoute(item.path) ? 'bg-gray-100/80' : ''
                 }`}
                 onClick={() => handleNavigation(item.path)}
               >
@@ -143,14 +143,14 @@ const OfficerNavbar = () => {
 
       {/* Mobile Menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden bg-shield-dark border-t border-gray-700">
+        <div className="md:hidden bg-white/90 backdrop-blur-md border-t border-gray-200">
           <div className="container mx-auto px-4 py-4 flex flex-col">
             {navItems.map((item, index) => (
               <Button
                 key={index}
                 variant="ghost"
-                className={`justify-start mb-2 ${
-                  isActiveRoute(item.path) ? 'bg-shield-dark-hover' : ''
+                className={`justify-start mb-2 text-gray-800 ${
+                  isActiveRoute(item.path) ? 'bg-gray-100/80' : ''
                 }`}
                 onClick={() => handleNavigation(item.path)}
               >
