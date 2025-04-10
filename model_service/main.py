@@ -10,11 +10,10 @@ import cv2
 import time
 import requests
 from typing import Optional
-import random  # Temporary for demo if no model is available
-
-# Add your ML model imports here
-# import torch
-# from your_model_module import YourModel
+import torch
+import tempfile
+from PIL import Image
+from torchvision import transforms
 
 app = FastAPI(title="Crime Detection API")
 
@@ -36,68 +35,104 @@ class AnalysisResponse(BaseModel):
     confidence: float
     description: str
 
+# Crime descriptions dictionary
+crime_descriptions = {
+    "abuse": 
+        "The detected video may involve abuse-related actions.\n"
+        "Abuse can be verbal, emotional, or physical.\n"
+        "It often includes intentional harm inflicted on a victim.\n"
+        "The victim may display distress or defensive behavior.\n"
+        "There might be aggressive body language or shouting.\n"
+        "Such scenes usually lack mutual consent or context of play.\n"
+        "These actions are violations of basic human rights.\n"
+        "It is important to report such behavior to authorities.\n"
+        "Detection helps in early intervention and protection.\n"
+        "Please verify with human oversight for further action.",
+    
+    "assault": 
+        "Assault involves a physical attack or aggressive encounter.\n"
+        "This may include punching, kicking, or pushing actions.\n"
+        "The victim may be seen retreating or being overpowered.\n"
+        "There is usually a visible conflict or threat present.\n"
+        "Such behavior is dangerous and potentially life-threatening.\n"
+        "Immediate attention from security or authorities is critical.\n"
+        "Assault detection can help prevent further escalation.\n"
+        "The video may include violent gestures or weapons.\n"
+        "Please proceed with care while reviewing such footage.\n"
+        "Confirm with experts before initiating legal steps.",
+    
+    "arson": 
+        "This video likely captures an incident of arson.\n"
+        "Arson is the criminal act of intentionally setting fire.\n"
+        "You may see flames, smoke, or ignition devices.\n"
+        "Often, it targets property like buildings or vehicles.\n"
+        "Arson can lead to massive destruction and danger to life.\n"
+        "There might be a rapid spread of fire visible.\n"
+        "Suspects may appear to flee the scene post-ignition.\n"
+        "These cases require immediate fire and law response.\n"
+        "Check for signs of accelerants or premeditated setup.\n"
+        "This detection must be validated with caution.",
+    
+    "arrest": 
+        "The scene likely depicts a law enforcement arrest.\n"
+        "An arrest involves restraining a suspect or individual.\n"
+        "You may see officers using handcuffs or other tools.\n"
+        "The individual may be cooperating or resisting.\n"
+        "It could be in public or private settings.\n"
+        "Often, the suspect is guided or pushed into a vehicle.\n"
+        "The presence of uniforms or badges may be evident.\n"
+        "These scenarios may follow legal procedures.\n"
+        "Misidentification is possible — confirm context.\n"
+        "Verify with official reports before assuming guilt."
+}
+
+# Define CrimeNet model
+class CrimeNet(torch.nn.Module):
+    def __init__(self, hidden_size=256, num_layers=1, num_classes=4, dropout=0.5):
+        super(CrimeNet, self).__init__()
+        # ResNet18 feature extraction - no need to import torchvision here since we won't actually use it
+        # We'll load from scripted model instead
+        self.cnn = None  # Just a placeholder
+        self.lstm = torch.nn.LSTM(
+            input_size=512,
+            hidden_size=hidden_size,
+            num_layers=num_layers,
+            batch_first=True,
+            dropout=dropout if num_layers > 1 else 0
+        )
+        self.dropout = torch.nn.Dropout(dropout)
+        self.fc = torch.nn.Linear(hidden_size, num_classes)
+
+    def forward(self, x):
+        # This won't be used since we'll load the scripted model
+        pass
+
+# Initialize model and transform
+transform = transforms.Compose([
+    transforms.Resize((112, 112)),
+    transforms.ToTensor()
+])
+
 # Initialize your model
-# Replace this with your actual model loading code
 def load_model():
     try:
         print("Loading crime detection model...")
-        # model = YourModel()
-        # model.load_weights("path/to/your/weights.pth")
-        print("Model loaded successfully")
-        return "model_placeholder"  # Return your actual model
+        model_path = os.path.join(os.path.dirname(__file__), "crime_classifier_scripted.pt")
+        if os.path.exists(model_path):
+            model = torch.jit.load(model_path, map_location=torch.device('cpu'))
+            print("Model loaded successfully from script")
+        else:
+            print(f"Model file not found at {model_path}, using fallback")
+            model = "model_placeholder"
+        return model
     except Exception as e:
         print(f"Error loading model: {e}")
         return None
 
 model = load_model()
+class_names = ['abuse', 'assault', 'arson', 'arrest']
 
-# Dictionary of crime descriptions - enhanced for more realistic detailed reports
-crime_descriptions = {
-    "abuse": """This video shows potential signs of abuse.
-The incident appears to involve harmful behavior directed toward an individual.
-The victim appears to be in distress or showing defensive posture.
-The aggressor displays controlling or intimidating behavior.
-The interaction shows power imbalance typical of abuse situations.
-Based on the visible patterns in the footage, authorities should investigate for potential domestic violence.
-The timestamp indicates this occurred during evening hours when such incidents are statistically more common.
-Facial expressions and body language indicate emotional distress.
-Recommend immediate intervention by trained personnel and victim support resources.""",
-    
-    "assault": """The video contains evidence of a physical assault.
-There is clear physical aggression between individuals.
-The attacker is making forceful physical contact with the victim.
-The victim appears to be defending themselves or attempting to escape.
-This type of incident typically requires immediate intervention.
-The level of force used appears excessive and unprovoked.
-The assault took place in what appears to be a public location.
-Multiple witnesses were present at the scene.
-Recommend immediate police notification and medical assistance for the victim.
-Video evidence should be preserved for potential legal proceedings.""",
-    
-    "arson": """The footage shows evidence of deliberate fire-setting.
-Flames or smoke are visible in an uncontrolled or suspicious context.
-The fire appears to have been intentionally started.
-Property damage is occurring as a result of the fire.
-This criminal act poses significant danger to life and property.
-The fire was started in a manner consistent with arson techniques.
-The suspect appears to have used accelerants to increase fire spread.
-Weather conditions at the time increased the danger of the fire.
-Recommend fire department investigation for point of origin.
-Surrounding structures were placed at significant risk due to this act.""",
-    
-    "arrest": """This video shows what appears to be an arrest in progress.
-Law enforcement personnel are visible detaining an individual.
-Standard arrest procedures such as handcuffing can be observed.
-The detained individual is being placed into custody.
-The scene shows typical elements of a police intervention.
-Police officers appear to be following standard protocol.
-Multiple officers are present to secure the scene.
-Bystanders are maintaining appropriate distance from the procedure.
-The arrest appears to be conducted in accordance with proper procedure.
-Further investigation would be needed to determine the nature of the offense."""
-}
-
-def extract_frames(video_path, max_frames=30):
+def extract_frames(video_path, max_frames=16):
     """Extract frames from a video file."""
     try:
         print(f"Extracting frames from {video_path}")
@@ -105,38 +140,40 @@ def extract_frames(video_path, max_frames=30):
         if not cap.isOpened():
             raise ValueError(f"Could not open video file {video_path}")
         
-        frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        if frame_count <= 0:
-            raise ValueError(f"No frames found in video {video_path}")
-            
-        # Calculate frame interval to extract evenly distributed frames
-        interval = max(1, frame_count // max_frames)
-        
         frames = []
-        count = 0
-        success = True
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        step = max(total_frames // max_frames, 1)
         
-        while success and len(frames) < max_frames:
-            cap.set(cv2.CAP_PROP_POS_FRAMES, count * interval)
+        for i in range(0, total_frames, step):
+            cap.set(cv2.CAP_PROP_POS_FRAMES, i)
             success, frame = cap.read()
             if success:
-                # Resize frame for model input
-                frame = cv2.resize(frame, (224, 224))
-                frames.append(frame)
-            count += 1
+                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                image = Image.fromarray(frame)
+                image = transform(image)
+                frames.append(image)
+                if len(frames) == max_frames:
+                    break
             
         cap.release()
-        print(f"Extracted {len(frames)} frames")
-        return frames
+        
+        # Pad if not enough frames
+        while len(frames) < max_frames:
+            if len(frames) > 0:
+                frames.append(torch.zeros_like(frames[0]))
+            else:
+                # If no frames were extracted, create a blank frame
+                frames.append(torch.zeros((3, 112, 112)))
+                
+        return torch.stack(frames)
     except Exception as e:
         print(f"Frame extraction error: {e}")
-        return []
+        return None
 
 def download_video(url, save_path):
     """Download video from URL."""
     try:
         print(f"Downloading video from {url}")
-        # Handle different URL types - this is a simplified example
         response = requests.get(url, stream=True, timeout=30)
         if response.status_code != 200:
             print(f"Failed to download video: HTTP {response.status_code}")
@@ -154,26 +191,32 @@ def download_video(url, save_path):
         print(f"Download error: {e}")
         return None
 
-def analyze_video_with_model(frames):
-    """Analyze video frames with the trained model."""
+def analyze_video_with_model(video_path):
+    """Analyze video with trained model."""
     try:
-        # This is where you would use your actual model
-        # Replace this with your model inference code
-        if model is None:
-            raise ValueError("Model not loaded")
-            
+        if model is None or model == "model_placeholder":
+            raise ValueError("Model not loaded properly")
+        
         print("Analyzing frames with model")
-        # Example for demonstration - replace with your actual model inference
-        # predictions = model.predict(np.array(frames))
+        frames = extract_frames(video_path)
+        if frames is None:
+            raise ValueError("Failed to extract frames")
         
-        # REPLACE THIS: Simulating model output
-        crime_types = ["abuse", "assault", "arson", "arrest"]
-        crime_type = random.choice(crime_types)
-        confidence = random.uniform(0.78, 0.98)
+        # Model prediction
+        input_tensor = frames.unsqueeze(0)  # Add batch dimension
         
-        # In your real implementation, use your actual model:
-        # crime_type = get_prediction_from_model(frames)
-        # confidence = get_confidence_from_model(frames)
+        if isinstance(model, str):  # Fallback if model loading failed
+            # Simulate model output
+            crime_type = class_names[np.random.randint(0, len(class_names))]
+            confidence = np.random.uniform(0.78, 0.98)
+        else:
+            # Use actual model
+            with torch.no_grad():
+                outputs = model(input_tensor)
+                probabilities = torch.nn.functional.softmax(outputs, dim=1)
+                confidence, predicted = torch.max(probabilities, 1)
+                crime_type = class_names[predicted.item()]
+                confidence = confidence.item()
         
         description = crime_descriptions.get(crime_type, "No detailed description available.")
         
@@ -206,13 +249,8 @@ async def analyze_video(request: VideoRequest):
         if not downloaded_path:
             raise HTTPException(status_code=400, detail="Failed to download video")
             
-        # Extract frames
-        frames = extract_frames(downloaded_path)
-        if not frames:
-            raise HTTPException(status_code=400, detail="Failed to extract frames from video")
-            
         # Analyze with model
-        result = analyze_video_with_model(frames)
+        result = analyze_video_with_model(downloaded_path)
         if not result:
             raise HTTPException(status_code=500, detail="Model analysis failed")
          
@@ -236,7 +274,7 @@ async def analyze_video(request: VideoRequest):
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
-    return {"status": "healthy", "model_loaded": model is not None}
+    return {"status": "healthy", "model_loaded": model is not None and model != "model_placeholder"}
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

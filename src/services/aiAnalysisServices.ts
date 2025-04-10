@@ -56,8 +56,40 @@ export const analyzeVideoEvidence = async (videoUrl: string, reportId?: string):
     
     console.log("Calling edge function to analyze video");
     
-    // Call the edge function to analyze the video
-    // The edge function will attempt to use the Python model service if available
+    try {
+      // First try to use the Python FastAPI model service
+      const response = await fetch('http://localhost:8000/analyze-video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ video_url: videoUrl }),
+        signal: AbortSignal.timeout(10000) // 10 second timeout
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log("Local model analysis successful:", data);
+        
+        const analysis: VideoAnalysisResult = {
+          crimeType: data.crime_type.toLowerCase(),
+          confidence: data.confidence,
+          description: data.description,
+          analysisTimestamp: new Date().toISOString()
+        };
+        
+        // Store the analysis result if we have a report ID
+        if (reportId) {
+          await storeAnalysisResult(reportId, analysis);
+        }
+        
+        return { success: true, analysis };
+      } else {
+        console.warn("Local model service returned error, using fallback:", await response.text());
+      }
+    } catch (modelError) {
+      console.warn("Local model service not available, using edge function:", modelError);
+    }
+    
+    // Fallback to edge function if local model fails
     const { data, error } = await supabase.functions.invoke('analyze-video-evidence', {
       body: { videoUrl, reportId }
     });
@@ -78,22 +110,7 @@ export const analyzeVideoEvidence = async (videoUrl: string, reportId?: string):
     
     // If we have a report ID, store the analysis result in the database
     if (reportId && data.analysis) {
-      try {
-        await supabase
-          .from('crime_report_analysis' as any)
-          .upsert({
-            report_id: reportId,
-            crime_type: data.analysis.crimeType,
-            confidence: data.analysis.confidence,
-            description: data.analysis.description,
-            model_version: 'v1.0'
-          });
-          
-        console.log("Analysis stored in database");
-      } catch (upsertError: any) {
-        console.error("Error storing analysis:", upsertError);
-        // Continue even if storage fails
-      }
+      await storeAnalysisResult(reportId, data.analysis);
     }
     
     return data;
@@ -103,6 +120,29 @@ export const analyzeVideoEvidence = async (videoUrl: string, reportId?: string):
     return { success: false, error: error.message };
   }
 };
+
+/**
+ * Store analysis result in the database
+ * @param reportId Report ID
+ * @param analysis Analysis result
+ */
+async function storeAnalysisResult(reportId: string, analysis: VideoAnalysisResult) {
+  try {
+    await supabase
+      .from('crime_report_analysis' as any)
+      .upsert({
+        report_id: reportId,
+        crime_type: analysis.crimeType,
+        confidence: analysis.confidence,
+        description: analysis.description,
+        model_version: 'v1.0'
+      });
+      
+    console.log("Analysis stored in database");
+  } catch (upsertError: any) {
+    console.error("Error storing analysis:", upsertError);
+  }
+}
 
 /**
  * Get analysis result for a specific report from the database
