@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useOfficerAuth } from '@/contexts/OfficerAuthContext';
@@ -180,6 +181,7 @@ const OfficerDashboard = () => {
       const caseNumber = `CASE-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
       const today = new Date();
       
+      // Insert into cases table first to get the case_id
       const { data: caseData, error: caseError } = await supabase
         .from('cases')
         .insert([{
@@ -200,6 +202,7 @@ const OfficerDashboard = () => {
       if (caseError) throw caseError;
       
       if (caseData && caseData.length > 0) {
+        // Then insert into crime_map_locations table with the case_id
         const { error: locationError } = await supabase
           .from('crime_map_locations' as any)
           .insert([{

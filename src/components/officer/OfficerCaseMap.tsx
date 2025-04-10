@@ -12,11 +12,13 @@ import { toast } from 'sonner';
 import { caseDensityData } from '@/data/caseDensityData'; 
 import { createCase, getCases } from '@/services/officerServices';
 import { CaseData } from '@/types/officer';
+import { supabase } from '@/integrations/supabase/client';
 
 const OfficerCaseMap = () => {
   // Generate Google Maps URL for Chennai
   const googleMapsUrl = "https://www.google.com/maps/search/Chennai+crime+hotspots";
   const [cases, setCases] = useState<CaseData[]>([]);
+  const [crimeMappedLocations, setCrimeMappedLocations] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [newCaseData, setNewCaseData] = useState({
     case_number: '',
@@ -36,11 +38,33 @@ const OfficerCaseMap = () => {
     const loadCases = async () => {
       try {
         setIsLoading(true);
-        const data = await getCases();
-        setCases(data);
+        
+        // Fetch cases
+        const cases = await getCases();
+        setCases(cases);
+        
+        // Fetch crime map locations
+        const { data: locations, error } = await supabase
+          .from('crime_map_locations' as any)
+          .select('*');
+          
+        if (error) {
+          console.error("Error fetching crime map locations:", error);
+          toast.error("Failed to load crime location data");
+        } else {
+          // Save to session storage for persistence
+          sessionStorage.setItem('crime_map_locations', JSON.stringify(locations || []));
+          setCrimeMappedLocations(locations || []);
+        }
       } catch (error) {
         console.error("Error fetching cases:", error);
         toast.error("Failed to load case data");
+        
+        // Try to load from session storage if available
+        const storedLocations = sessionStorage.getItem('crime_map_locations');
+        if (storedLocations) {
+          setCrimeMappedLocations(JSON.parse(storedLocations));
+        }
       } finally {
         setIsLoading(false);
       }
@@ -75,7 +99,38 @@ const OfficerCaseMap = () => {
         longitude: newCaseData.longitude ? parseFloat(newCaseData.longitude) : null
       };
       
-      await createCase(formattedData);
+      // First create the case
+      const newCases = await createCase(formattedData);
+      
+      if (newCases && newCases.length > 0) {
+        // Then add to crime map locations
+        const { data: locationData, error: locationError } = await supabase
+          .from('crime_map_locations' as any)
+          .insert([{
+            case_id: newCases[0].case_id,
+            latitude: formattedData.latitude,
+            longitude: formattedData.longitude,
+            title: newCaseData.case_number,
+            description: newCaseData.description,
+            crime_type: newCaseData.case_type
+          }] as any)
+          .select();
+          
+        if (locationError) {
+          console.error("Error adding to crime map:", locationError);
+          toast.error("Case added but failed to add to map");
+        } else {
+          // Update local state with the new location
+          if (locationData) {
+            setCrimeMappedLocations(prev => [...prev, ...locationData]);
+            
+            // Update session storage
+            const storedLocations = sessionStorage.getItem('crime_map_locations');
+            const parsedLocations = storedLocations ? JSON.parse(storedLocations) : [];
+            sessionStorage.setItem('crime_map_locations', JSON.stringify([...parsedLocations, ...locationData]));
+          }
+        }
+      }
       
       toast.success("Case added successfully");
       setDialogOpen(false);
@@ -106,18 +161,24 @@ const OfficerCaseMap = () => {
   const generateMapUrl = () => {
     let baseUrl = "https://www.google.com/maps/search/?api=1&query=";
     
-    // If we have cases with coordinates, add them to the map
-    if (cases.length > 0) {
-      const locationsParam = cases
-        .filter(c => c.latitude && c.longitude)
-        .map(c => {
-          const label = encodeURIComponent(`${c.case_type} - ${c.case_number}`);
-          return `${c.latitude},${c.longitude}(${label})`;
+    // Use crime map locations if available, otherwise fall back to cases
+    const locations = crimeMappedLocations.length > 0 ? crimeMappedLocations : 
+      cases.filter(c => c.latitude && c.longitude);
+    
+    // If we have locations with coordinates, add them to the map
+    if (locations.length > 0) {
+      // Create a comma-separated list of coordinates for Google Maps
+      const coordinatesParam = locations
+        .filter(loc => loc.latitude && loc.longitude)
+        .slice(0, 10) // Limit to 10 locations to avoid URL length issues
+        .map(loc => {
+          return `${loc.latitude},${loc.longitude}`;
         })
         .join('|');
       
-      if (locationsParam) {
-        return `https://www.google.com/maps/dir/?api=1&destination=${locationsParam}&travelmode=driving`;
+      if (coordinatesParam) {
+        // Add crime locations to map
+        return `https://www.google.com/maps/search/${coordinatesParam}/`;
       }
     }
     
@@ -125,7 +186,7 @@ const OfficerCaseMap = () => {
     return baseUrl + "crime+locations+chennai";
   };
   
-  // Determine if we should show the map or loading state
+  // Generate the map URL
   const mapUrl = generateMapUrl();
   
   return (

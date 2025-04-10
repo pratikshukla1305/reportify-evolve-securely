@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { getOfficerReports, updateReportStatus } from '@/services/reportServices';
@@ -126,7 +125,6 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
       
       // Log the view completion
       try {
-        // Use type 'any' for now to bypass type checking
         await supabase
           .from('evidence_views' as any)
           .insert([{
@@ -142,7 +140,6 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
       
       // Log the view start
       try {
-        // Use type 'any' for now to bypass type checking
         await supabase
           .from('evidence_views' as any)
           .insert([{
@@ -248,7 +245,7 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
         // Save the PDF
         pdf.save(filename);
         
-        // Log PDF download in database using type assertion
+        // Log PDF download in database
         await supabase
           .from('pdf_downloads' as any)
           .insert([{
@@ -265,7 +262,7 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
       } catch (error) {
         console.error("Error generating PDF:", error);
         
-        // Log failed PDF download attempt using type assertion
+        // Log failed PDF download attempt
         await supabase
           .from('pdf_downloads' as any)
           .insert([{
