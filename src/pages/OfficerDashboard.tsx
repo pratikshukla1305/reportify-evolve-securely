@@ -12,8 +12,8 @@ import OfficerCriminalPanel from '@/components/officer/OfficerCriminalPanel';
 import OfficerCaseMap from '@/components/officer/OfficerCaseMap';
 import ReportsList from '@/components/officer/ReportsList';
 import { getOfficerReports } from '@/services/reportServices';
-import { getSosAlerts } from '@/services/officerServices';
-import { getKycVerifications } from '@/services/officerServices';
+import { getSosAlerts, getKycVerifications } from '@/services/officerServices';
+import { toast } from 'sonner';
 
 const OfficerDashboard = () => {
   const { officer, isAuthenticated } = useOfficerAuth();
@@ -23,6 +23,7 @@ const OfficerDashboard = () => {
   const [alertsCount, setAlertsCount] = useState({ total: 0, highPriority: 0 });
   const [kycCount, setKycCount] = useState({ total: 0, lastUpdated: '' });
   const [reportsCount, setReportsCount] = useState({ total: 0, todaySubmissions: 0 });
+  const [isLoading, setIsLoading] = useState(true);
 
   // Get the tab parameter from URL
   useEffect(() => {
@@ -43,20 +44,46 @@ const OfficerDashboard = () => {
   useEffect(() => {
     const fetchCounts = async () => {
       try {
+        setIsLoading(true);
+        
         // Fetch SOS alerts count
         const alertsData = await getSosAlerts();
         const highPriorityAlerts = alertsData.filter(alert => 
-          alert.urgency_level?.toLowerCase() === 'high').length;
+          alert.urgency_level?.toLowerCase() === 'high' && 
+          alert.status?.toLowerCase() !== 'resolved').length;
         setAlertsCount({
-          total: alertsData.length,
+          total: alertsData.filter(alert => alert.status?.toLowerCase() !== 'resolved').length,
           highPriority: highPriorityAlerts
         });
 
         // Fetch KYC verifications count
         const kycData = await getKycVerifications();
+        const pendingKyc = kycData.filter(kyc => 
+          kyc.status?.toLowerCase() === 'pending').length;
+        
+        // Calculate last updated time
+        let lastUpdated = 'N/A';
+        if (kycData.length > 0) {
+          const mostRecent = new Date(Math.max(...kycData.map(k => new Date(k.submission_date).getTime())));
+          const now = new Date();
+          const diffMs = now.getTime() - mostRecent.getTime();
+          const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
+          
+          if (diffHrs < 1) {
+            lastUpdated = 'Just now';
+          } else if (diffHrs === 1) {
+            lastUpdated = '1 hour ago';
+          } else if (diffHrs < 24) {
+            lastUpdated = `${diffHrs} hours ago`;
+          } else {
+            const diffDays = Math.floor(diffHrs / 24);
+            lastUpdated = `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+          }
+        }
+        
         setKycCount({
-          total: kycData.length,
-          lastUpdated: kycData.length > 0 ? '1h ago' : 'N/A'
+          total: pendingKyc,
+          lastUpdated
         });
 
         // Fetch reports count
@@ -66,19 +93,32 @@ const OfficerDashboard = () => {
         const today = new Date().toISOString().split('T')[0];
         const todaySubmissions = reportsData.filter(report => {
           const reportDate = new Date(report.report_date).toISOString().split('T')[0];
-          return reportDate === today;
+          return reportDate === today && report.status?.toLowerCase() === 'submitted';
         }).length;
 
+        // Only count non-completed reports for the total
+        const activeReports = reportsData.filter(report => 
+          report.status?.toLowerCase() !== 'completed').length;
+
         setReportsCount({
-          total: reportsData.length,
+          total: activeReports,
           todaySubmissions
         });
       } catch (error) {
         console.error("Error fetching counts:", error);
+        toast("Error fetching dashboard data");
+      } finally {
+        setIsLoading(false);
       }
     };
 
     fetchCounts();
+    
+    // Set up an interval to refresh counts every 3 minutes
+    const intervalId = setInterval(fetchCounts, 3 * 60 * 1000);
+    
+    // Clean up the interval
+    return () => clearInterval(intervalId);
   }, []);
 
   const handleTabChange = (value: string) => {
@@ -116,10 +156,16 @@ const OfficerDashboard = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-bold">{alertsCount.total}</p>
-              <p className="text-sm text-red-500">
-                {alertsCount.highPriority > 0 ? `${alertsCount.highPriority} high priority` : 'No high priority alerts'}
-              </p>
+              {isLoading ? (
+                <div className="animate-pulse h-8 bg-gray-200 rounded"></div>
+              ) : (
+                <>
+                  <p className="text-2xl font-bold">{alertsCount.total}</p>
+                  <p className="text-sm text-red-500">
+                    {alertsCount.highPriority > 0 ? `${alertsCount.highPriority} high priority` : 'No high priority alerts'}
+                  </p>
+                </>
+              )}
             </CardContent>
           </Card>
           
@@ -134,8 +180,14 @@ const OfficerDashboard = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-bold">{kycCount.total}</p>
-              <p className="text-sm text-gray-500">Last updated {kycCount.lastUpdated}</p>
+              {isLoading ? (
+                <div className="animate-pulse h-8 bg-gray-200 rounded"></div>
+              ) : (
+                <>
+                  <p className="text-2xl font-bold">{kycCount.total}</p>
+                  <p className="text-sm text-gray-500">Last updated {kycCount.lastUpdated}</p>
+                </>
+              )}
             </CardContent>
           </Card>
           
@@ -150,10 +202,16 @@ const OfficerDashboard = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-bold">{reportsCount.total}</p>
-              <p className="text-sm text-gray-500">
-                {reportsCount.todaySubmissions > 0 ? `${reportsCount.todaySubmissions} submitted today` : 'No submissions today'}
-              </p>
+              {isLoading ? (
+                <div className="animate-pulse h-8 bg-gray-200 rounded"></div>
+              ) : (
+                <>
+                  <p className="text-2xl font-bold">{reportsCount.total}</p>
+                  <p className="text-sm text-gray-500">
+                    {reportsCount.todaySubmissions > 0 ? `${reportsCount.todaySubmissions} submitted today` : 'No submissions today'}
+                  </p>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -241,7 +299,6 @@ const OfficerDashboard = () => {
             </TabsContent>
           </div>
         </Tabs>
-
       </div>
     </div>
   );

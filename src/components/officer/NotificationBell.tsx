@@ -119,7 +119,24 @@ const NotificationBell = () => {
 
   // Handle notification click based on its type
   const handleNotificationClick = (notification: Notification) => {
+    // First mark as read
     markAsRead(notification.id, notification.report_id);
+    
+    // Then navigate based on notification type
+    switch (notification.notification_type) {
+      case 'new_report':
+        navigate(`/officer-dashboard?tab=reports`);
+        break;
+      case 'kyc_verification':
+        navigate(`/officer-dashboard?tab=kyc`);
+        break;
+      case 'sos_alert':
+        navigate(`/officer-dashboard?tab=alerts`);
+        break;
+      default:
+        // For other types, just navigate to dashboard
+        navigate('/officer-dashboard');
+    }
   };
 
   return (
@@ -158,7 +175,15 @@ const NotificationBell = () => {
                 onClick={() => handleNotificationClick(notification)}
               >
                 <div className="flex items-center w-full">
-                  <span className="font-medium">{notification.notification_type === 'new_report' ? 'New Report' : 'Notification'}</span>
+                  <span className="font-medium">
+                    {notification.notification_type === 'new_report' 
+                      ? 'New Report'
+                      : notification.notification_type === 'kyc_verification'
+                        ? 'KYC Verification'
+                        : notification.notification_type === 'sos_alert'
+                          ? 'SOS Alert'
+                          : 'Notification'}
+                  </span>
                   {!notification.is_read && (
                     <Badge className="ml-2 bg-blue-500">New</Badge>
                   )}
