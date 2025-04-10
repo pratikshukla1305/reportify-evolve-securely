@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Shield, Menu, X, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useOfficerAuth } from '@/contexts/OfficerAuthContext';
@@ -18,6 +18,7 @@ const OfficerNavbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { officer, signOut } = useOfficerAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   
   const handleSignOut = async () => {
     await signOut();
@@ -26,6 +27,10 @@ const OfficerNavbar = () => {
   
   const handleLinkClick = () => {
     setIsMenuOpen(false);
+  };
+
+  const navigateToTab = (tab: string) => {
+    navigate(`/officer-dashboard?tab=${tab}`);
   };
 
   return (
@@ -37,7 +42,7 @@ const OfficerNavbar = () => {
             <Link to="/officer-dashboard" className="flex items-center">
               <Shield className="h-8 w-8 text-shield-blue" />
               <div className="ml-2">
-                <div className="text-xl font-bold text-gray-900">ShieldAI</div>
+                <div className="text-xl font-bold text-gray-900">Shield</div>
                 <div className="text-xs font-medium text-blue-600 -mt-1">Officer Portal</div>
               </div>
             </Link>
@@ -45,18 +50,38 @@ const OfficerNavbar = () => {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-8">
-            <Link to="/officer-dashboard" className="text-gray-700 hover:text-shield-blue font-medium transition-colors">
+            <button 
+              onClick={() => navigate('/officer-dashboard')} 
+              className={`text-gray-700 hover:text-shield-blue font-medium transition-colors ${
+                location.pathname === '/officer-dashboard' && !location.search ? 'text-shield-blue' : ''
+              }`}
+            >
               Dashboard
-            </Link>
-            <Link to="/officer-dashboard?tab=alerts" className="text-gray-700 hover:text-shield-blue font-medium transition-colors">
+            </button>
+            <button 
+              onClick={() => navigateToTab('alerts')} 
+              className={`text-gray-700 hover:text-shield-blue font-medium transition-colors ${
+                location.search?.includes('tab=alerts') ? 'text-shield-blue' : ''
+              }`}
+            >
               SOS Alerts
-            </Link>
-            <Link to="/officer-dashboard?tab=reports" className="text-gray-700 hover:text-shield-blue font-medium transition-colors">
+            </button>
+            <button 
+              onClick={() => navigateToTab('reports')} 
+              className={`text-gray-700 hover:text-shield-blue font-medium transition-colors ${
+                location.search?.includes('tab=reports') ? 'text-shield-blue' : ''
+              }`}
+            >
               Reports
-            </Link>
-            <Link to="/officer-dashboard?tab=map" className="text-gray-700 hover:text-shield-blue font-medium transition-colors">
+            </button>
+            <button 
+              onClick={() => navigateToTab('map')} 
+              className={`text-gray-700 hover:text-shield-blue font-medium transition-colors ${
+                location.search?.includes('tab=map') ? 'text-shield-blue' : ''
+              }`}
+            >
               Crime Map
-            </Link>
+            </button>
             
             <div className="flex items-center space-x-4">
               <NotificationBell />
@@ -106,50 +131,60 @@ const OfficerNavbar = () => {
       {isMenuOpen && (
         <div className="md:hidden">
           <div className="px-2 pt-2 pb-3 space-y-1">
-            <Link 
-              to="/officer-dashboard" 
-              className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-100"
-              onClick={handleLinkClick}
+            <button 
+              onClick={() => {
+                navigate('/officer-dashboard');
+                handleLinkClick();
+              }} 
+              className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-100"
             >
               Dashboard
-            </Link>
-            <Link 
-              to="/officer-dashboard?tab=alerts" 
-              className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-100"
-              onClick={handleLinkClick}
+            </button>
+            <button 
+              onClick={() => {
+                navigateToTab('alerts');
+                handleLinkClick();
+              }} 
+              className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-100"
             >
               SOS Alerts
-            </Link>
-            <Link 
-              to="/officer-dashboard?tab=reports" 
-              className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-100"
-              onClick={handleLinkClick}
+            </button>
+            <button 
+              onClick={() => {
+                navigateToTab('reports');
+                handleLinkClick();
+              }} 
+              className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-100"
             >
               Reports
-            </Link>
-            <Link 
-              to="/officer-dashboard?tab=map" 
-              className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-100"
-              onClick={handleLinkClick}
+            </button>
+            <button 
+              onClick={() => {
+                navigateToTab('map');
+                handleLinkClick();
+              }} 
+              className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-100"
             >
               Crime Map
-            </Link>
-            <Link 
-              to="/officer-profile" 
-              className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-100"
-              onClick={handleLinkClick}
+            </button>
+            <button 
+              onClick={() => {
+                navigate('/officer-profile');
+                handleLinkClick();
+              }}
+              className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-100"
             >
               Profile
-            </Link>
-            <div 
-              className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-100 cursor-pointer"
+            </button>
+            <button 
+              className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-100"
               onClick={() => {
                 handleSignOut();
                 handleLinkClick();
               }}
             >
               Sign out
-            </div>
+            </button>
           </div>
         </div>
       )}

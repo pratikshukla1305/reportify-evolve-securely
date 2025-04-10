@@ -1,6 +1,6 @@
 
-import React, { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useOfficerAuth } from '@/contexts/OfficerAuthContext';
 import OfficerNavbar from '@/components/officer/OfficerNavbar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,16 +11,86 @@ import KycVerificationList from '@/components/officer/KycVerificationList';
 import OfficerCriminalPanel from '@/components/officer/OfficerCriminalPanel';
 import OfficerCaseMap from '@/components/officer/OfficerCaseMap';
 import ReportsList from '@/components/officer/ReportsList';
+import { getOfficerReports } from '@/services/reportServices';
+import { getSosAlerts } from '@/services/officerServices';
+import { getKycVerifications } from '@/services/officerServices';
 
 const OfficerDashboard = () => {
   const { officer, isAuthenticated } = useOfficerAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [activeTab, setActiveTab] = useState('alerts');
+  const [alertsCount, setAlertsCount] = useState({ total: 0, highPriority: 0 });
+  const [kycCount, setKycCount] = useState({ total: 0, lastUpdated: '' });
+  const [reportsCount, setReportsCount] = useState({ total: 0, todaySubmissions: 0 });
+
+  // Get the tab parameter from URL
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const tab = searchParams.get('tab');
+    if (tab) {
+      setActiveTab(tab);
+    }
+  }, [location.search]);
 
   useEffect(() => {
     if (!isAuthenticated) {
       navigate('/officer-login');
     }
   }, [isAuthenticated, navigate]);
+
+  // Fetch counts for dashboard cards
+  useEffect(() => {
+    const fetchCounts = async () => {
+      try {
+        // Fetch SOS alerts count
+        const alertsData = await getSosAlerts();
+        const highPriorityAlerts = alertsData.filter(alert => 
+          alert.urgency_level?.toLowerCase() === 'high').length;
+        setAlertsCount({
+          total: alertsData.length,
+          highPriority: highPriorityAlerts
+        });
+
+        // Fetch KYC verifications count
+        const kycData = await getKycVerifications();
+        setKycCount({
+          total: kycData.length,
+          lastUpdated: kycData.length > 0 ? '1h ago' : 'N/A'
+        });
+
+        // Fetch reports count
+        const reportsData = await getOfficerReports();
+        
+        // Calculate today's submissions
+        const today = new Date().toISOString().split('T')[0];
+        const todaySubmissions = reportsData.filter(report => {
+          const reportDate = new Date(report.report_date).toISOString().split('T')[0];
+          return reportDate === today;
+        }).length;
+
+        setReportsCount({
+          total: reportsData.length,
+          todaySubmissions
+        });
+      } catch (error) {
+        console.error("Error fetching counts:", error);
+      }
+    };
+
+    fetchCounts();
+  }, []);
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    // Update URL without reloading page
+    const searchParams = new URLSearchParams(location.search);
+    searchParams.set('tab', value);
+    navigate({
+      pathname: location.pathname,
+      search: searchParams.toString()
+    }, { replace: true });
+  };
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -46,8 +116,10 @@ const OfficerDashboard = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-bold">12</p>
-              <p className="text-sm text-red-500">3 high priority</p>
+              <p className="text-2xl font-bold">{alertsCount.total}</p>
+              <p className="text-sm text-red-500">
+                {alertsCount.highPriority > 0 ? `${alertsCount.highPriority} high priority` : 'No high priority alerts'}
+              </p>
             </CardContent>
           </Card>
           
@@ -62,8 +134,8 @@ const OfficerDashboard = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-bold">8</p>
-              <p className="text-sm text-gray-500">Last updated 1h ago</p>
+              <p className="text-2xl font-bold">{kycCount.total}</p>
+              <p className="text-sm text-gray-500">Last updated {kycCount.lastUpdated}</p>
             </CardContent>
           </Card>
           
@@ -78,13 +150,15 @@ const OfficerDashboard = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-bold">17</p>
-              <p className="text-sm text-gray-500">5 submitted today</p>
+              <p className="text-2xl font-bold">{reportsCount.total}</p>
+              <p className="text-sm text-gray-500">
+                {reportsCount.todaySubmissions > 0 ? `${reportsCount.todaySubmissions} submitted today` : 'No submissions today'}
+              </p>
             </CardContent>
           </Card>
         </div>
 
-        <Tabs defaultValue="alerts" className="mb-8">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="mb-8">
           <TabsList className="w-full max-w-md grid grid-cols-5">
             <TabsTrigger value="alerts">SOS Alerts</TabsTrigger>
             <TabsTrigger value="kyc">KYC</TabsTrigger>

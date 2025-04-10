@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { useNavigate } from 'react-router-dom';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,6 +26,7 @@ interface Notification {
 const NotificationBell = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchNotifications = async () => {
@@ -70,7 +72,7 @@ const NotificationBell = () => {
     };
   }, []);
 
-  const markAsRead = async (id: string) => {
+  const markAsRead = async (id: string, reportId: string | null = null) => {
     try {
       // Use type assertion to work around TypeScript limitations
       await supabase
@@ -83,6 +85,11 @@ const NotificationBell = () => {
         n.id === id ? { ...n, is_read: true } : n
       ));
       setUnreadCount(prev => Math.max(0, prev - 1));
+      
+      // Navigate to the appropriate page if reportId exists
+      if (reportId) {
+        navigate(`/officer-dashboard?tab=reports`);
+      }
     } catch (error) {
       console.error('Error marking notification as read:', error);
     }
@@ -108,6 +115,11 @@ const NotificationBell = () => {
     } catch (error) {
       console.error('Error marking all notifications as read:', error);
     }
+  };
+
+  // Handle notification click based on its type
+  const handleNotificationClick = (notification: Notification) => {
+    markAsRead(notification.id, notification.report_id);
   };
 
   return (
@@ -143,7 +155,7 @@ const NotificationBell = () => {
               <DropdownMenuItem 
                 key={notification.id} 
                 className={`flex flex-col items-start p-3 cursor-pointer ${!notification.is_read ? 'bg-blue-50' : ''}`}
-                onClick={() => markAsRead(notification.id)}
+                onClick={() => handleNotificationClick(notification)}
               >
                 <div className="flex items-center w-full">
                   <span className="font-medium">{notification.notification_type === 'new_report' ? 'New Report' : 'Notification'}</span>
@@ -159,7 +171,12 @@ const NotificationBell = () => {
             ))}
             <DropdownMenuSeparator />
             <DropdownMenuItem className="flex justify-center">
-              <Button variant="ghost" size="sm" className="w-full text-xs">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="w-full text-xs"
+                onClick={() => navigate('/officer-dashboard')}
+              >
                 View all notifications
               </Button>
             </DropdownMenuItem>

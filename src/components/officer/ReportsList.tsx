@@ -22,6 +22,7 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
   const [activePreview, setActivePreview] = useState<string | null>(null);
+  const [reportDetailOpen, setReportDetailOpen] = useState<string | null>(null);
 
   const fetchReports = async () => {
     setIsLoading(true);
@@ -51,7 +52,7 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
     setIsProcessing(true);
     try {
       await updateReportStatus(reportId, status, officerNotes);
-      fetchReports();
+      await fetchReports(); // Refresh the reports list
       toast({
         title: "Status updated",
         description: `Report status changed to ${status}`,
@@ -87,6 +88,14 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
       setActivePreview(null);
     } else {
       setActivePreview(url);
+    }
+  };
+
+  const toggleReportDetail = (reportId: string) => {
+    if (reportDetailOpen === reportId) {
+      setReportDetailOpen(null);
+    } else {
+      setReportDetailOpen(reportId);
     }
   };
 
@@ -210,10 +219,54 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
                 size="sm"
                 variant="outline"
                 className="border-blue-500 text-blue-600 hover:bg-blue-50"
+                onClick={() => toggleReportDetail(report.id)}
               >
-                View Details
+                {reportDetailOpen === report.id ? 'Hide Details' : 'View Details'}
               </Button>
             </div>
+
+            {/* Report Detail View */}
+            {reportDetailOpen === report.id && (
+              <div className="mt-4 pt-4 border-t">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-500 mb-1">Report ID</h4>
+                    <p className="text-sm">{report.id}</p>
+                  </div>
+                  
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-500 mb-1">Status</h4>
+                    <p className="text-sm">{report.status}</p>
+                  </div>
+                  
+                  {report.location && (
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-500 mb-1">Location</h4>
+                      <p className="text-sm">{report.location}</p>
+                    </div>
+                  )}
+                  
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-500 mb-1">Report Date</h4>
+                    <p className="text-sm">{format(new Date(report.report_date), 'PPP p')}</p>
+                  </div>
+                  
+                  {report.incident_date && (
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-500 mb-1">Incident Date</h4>
+                      <p className="text-sm">{format(new Date(report.incident_date), 'PPP p')}</p>
+                    </div>
+                  )}
+                  
+                  {report.officer_notes && (
+                    <div className="md:col-span-2">
+                      <h4 className="text-sm font-medium text-gray-500 mb-1">Officer Notes</h4>
+                      <p className="text-sm p-2 bg-gray-50 rounded">{report.officer_notes}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       ))}
@@ -256,7 +309,7 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
                     disabled={isProcessing}
                   >
                     <FileCheck className="mr-2 h-4 w-4" />
-                    Mark as Processing
+                    {isProcessing ? "Updating..." : "Mark as Processing"}
                   </Button>
                 )}
                 {selectedReport.status !== 'completed' && (
@@ -266,7 +319,7 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
                     disabled={isProcessing}
                   >
                     <FileCheck className="mr-2 h-4 w-4" />
-                    Mark as Completed
+                    {isProcessing ? "Updating..." : "Mark as Completed"}
                   </Button>
                 )}
               </>

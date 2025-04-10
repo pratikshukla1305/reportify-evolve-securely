@@ -11,6 +11,7 @@ type OfficerAuthContextType = {
   signIn: (email: string, password: string) => Promise<{ error: any | null }>;
   signOut: () => Promise<void>;
   getProfile: () => Promise<Officer | null>;
+  refreshProfile: () => Promise<void>;
 };
 
 const OfficerAuthContext = createContext<OfficerAuthContextType | undefined>(undefined);
@@ -98,6 +99,40 @@ export const OfficerAuthProvider: React.FC<{ children: React.ReactNode }> = ({ c
     if (!officer) return null;
     return officer;
   };
+  
+  const refreshProfile = async () => {
+    if (!officer) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('officer_profiles')
+        .select('*')
+        .eq('id', officer.id)
+        .single();
+        
+      if (error) {
+        console.error("Error refreshing officer profile:", error);
+        return;
+      }
+      
+      if (data) {
+        const updatedOfficerData: Officer = {
+          id: data.id,
+          full_name: data.full_name,
+          badge_number: data.badge_number,
+          department: data.department,
+          department_email: data.department_email,
+          phone_number: data.phone_number
+        };
+        
+        // Update local storage and state
+        localStorage.setItem('officer', JSON.stringify(updatedOfficerData));
+        setOfficer(updatedOfficerData);
+      }
+    } catch (err) {
+      console.error("Error refreshing profile:", err);
+    }
+  };
 
   const value = {
     officer,
@@ -105,7 +140,8 @@ export const OfficerAuthProvider: React.FC<{ children: React.ReactNode }> = ({ c
     isAuthenticated,
     signIn,
     signOut,
-    getProfile
+    getProfile,
+    refreshProfile
   };
 
   return <OfficerAuthContext.Provider value={value}>{children}</OfficerAuthContext.Provider>;
