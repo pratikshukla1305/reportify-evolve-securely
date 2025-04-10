@@ -16,7 +16,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 const OfficerCaseMap = () => {
   // Generate Google Maps URL for Chennai
-  const googleMapsUrl = "https://www.google.com/maps/search/Chennai+crime+hotspots";
+  const [googleMapsUrl, setGoogleMapsUrl] = useState("https://www.google.com/maps/search/Chennai+crime+hotspots");
   const [cases, setCases] = useState<CaseData[]>([]);
   const [crimeMappedLocations, setCrimeMappedLocations] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -41,20 +41,57 @@ const OfficerCaseMap = () => {
         
         // Fetch cases
         const cases = await getCases();
+        console.log("Fetched cases:", cases);
         setCases(cases);
         
         // Fetch crime map locations
         const { data: locations, error } = await supabase
-          .from('crime_map_locations' as any)
+          .from('crime_map_locations')
           .select('*');
           
         if (error) {
           console.error("Error fetching crime map locations:", error);
           toast.error("Failed to load crime location data");
         } else {
+          console.log("Fetched crime locations:", locations);
+          
+          // If no real data, add some sample data for demonstration
+          const locationsToUse = locations && locations.length > 0 ? locations : [
+            {
+              id: "1",
+              case_id: 1,
+              latitude: 13.0827,
+              longitude: 80.2707,
+              title: "Chennai Central Theft",
+              description: "Sample theft case",
+              crime_type: "theft"
+            },
+            {
+              id: "2", 
+              case_id: 2,
+              latitude: 13.0569,
+              longitude: 80.2425,
+              title: "T Nagar Burglary",
+              description: "Sample burglary case",
+              crime_type: "burglary"
+            },
+            {
+              id: "3",
+              case_id: 3, 
+              latitude: 13.1067,
+              longitude: 80.2206,
+              title: "Anna Nagar Assault",
+              description: "Sample assault case",
+              crime_type: "assault"
+            }
+          ];
+          
           // Save to session storage for persistence
-          sessionStorage.setItem('crime_map_locations', JSON.stringify(locations || []));
-          setCrimeMappedLocations(locations || []);
+          sessionStorage.setItem('crime_map_locations', JSON.stringify(locationsToUse));
+          setCrimeMappedLocations(locationsToUse);
+          
+          // Update Google Maps URL with these coordinates
+          updateGoogleMapsUrl(locationsToUse);
         }
       } catch (error) {
         console.error("Error fetching cases:", error);
@@ -63,7 +100,9 @@ const OfficerCaseMap = () => {
         // Try to load from session storage if available
         const storedLocations = sessionStorage.getItem('crime_map_locations');
         if (storedLocations) {
-          setCrimeMappedLocations(JSON.parse(storedLocations));
+          const parsedLocations = JSON.parse(storedLocations);
+          setCrimeMappedLocations(parsedLocations);
+          updateGoogleMapsUrl(parsedLocations);
         }
       } finally {
         setIsLoading(false);
@@ -71,7 +110,31 @@ const OfficerCaseMap = () => {
     };
 
     loadCases();
+    
+    // Set up a refresh interval
+    const intervalId = setInterval(() => {
+      loadCases();
+    }, 5 * 60 * 1000); // Refresh every 5 minutes
+    
+    return () => {
+      clearInterval(intervalId);
+    };
   }, []);
+
+  const updateGoogleMapsUrl = (locations: any[]) => {
+    if (!locations || locations.length === 0) return;
+    
+    // Create a Google Maps search URL with crime locations
+    const coordinatesQuery = locations
+      .filter(loc => loc.latitude && loc.longitude)
+      .slice(0, 10) // Limit to 10 locations to avoid URL length issues
+      .map(loc => `${loc.latitude},${loc.longitude}`)
+      .join('|');
+    
+    if (coordinatesQuery) {
+      setGoogleMapsUrl(`https://www.google.com/maps/search/${coordinatesQuery}/`);
+    }
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -105,7 +168,7 @@ const OfficerCaseMap = () => {
       if (newCases && newCases.length > 0) {
         // Then add to crime map locations
         const { data: locationData, error: locationError } = await supabase
-          .from('crime_map_locations' as any)
+          .from('crime_map_locations')
           .insert([{
             case_id: newCases[0].case_id,
             latitude: formattedData.latitude,
@@ -113,7 +176,7 @@ const OfficerCaseMap = () => {
             title: newCaseData.case_number,
             description: newCaseData.description,
             crime_type: newCaseData.case_type
-          }] as any)
+          }])
           .select();
           
         if (locationError) {
@@ -122,12 +185,14 @@ const OfficerCaseMap = () => {
         } else {
           // Update local state with the new location
           if (locationData) {
-            setCrimeMappedLocations(prev => [...prev, ...locationData]);
+            const updatedLocations = [...crimeMappedLocations, ...locationData];
+            setCrimeMappedLocations(updatedLocations);
             
             // Update session storage
-            const storedLocations = sessionStorage.getItem('crime_map_locations');
-            const parsedLocations = storedLocations ? JSON.parse(storedLocations) : [];
-            sessionStorage.setItem('crime_map_locations', JSON.stringify([...parsedLocations, ...locationData]));
+            sessionStorage.setItem('crime_map_locations', JSON.stringify(updatedLocations));
+            
+            // Update Google Maps URL
+            updateGoogleMapsUrl(updatedLocations);
           }
         }
       }
@@ -158,45 +223,28 @@ const OfficerCaseMap = () => {
     }
   };
 
-  const generateMapUrl = () => {
-    let baseUrl = "https://www.google.com/maps/search/?api=1&query=";
-    
-    // Use crime map locations if available, otherwise fall back to cases
-    const locations = crimeMappedLocations.length > 0 ? crimeMappedLocations : 
-      cases.filter(c => c.latitude && c.longitude);
-    
-    // If we have locations with coordinates, add them to the map
-    if (locations.length > 0) {
-      // Create a comma-separated list of coordinates for Google Maps
-      const coordinatesParam = locations
-        .filter(loc => loc.latitude && loc.longitude)
-        .slice(0, 10) // Limit to 10 locations to avoid URL length issues
-        .map(loc => {
-          return `${loc.latitude},${loc.longitude}`;
-        })
-        .join('|');
-      
-      if (coordinatesParam) {
-        // Add crime locations to map
-        return `https://www.google.com/maps/search/${coordinatesParam}/`;
-      }
-    }
-    
-    // Fallback to general search
-    return baseUrl + "crime+locations+chennai";
-  };
-  
-  // Generate the map URL
-  const mapUrl = generateMapUrl();
-  
   return (
     <div className="h-full relative">
       <StaticMap 
         altText="Case Distribution Map" 
-        redirectPath={mapUrl}
+        redirectPath={googleMapsUrl}
         buttonText="View Crime Locations Map"
         description="Click to see detailed crime locations in Google Maps"
       />
+      
+      {isLoading && (
+        <div className="absolute inset-0 bg-white bg-opacity-70 flex items-center justify-center">
+          <div className="flex flex-col items-center">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-shield-blue mb-2"></div>
+            <p className="text-shield-blue">Loading crime map data...</p>
+          </div>
+        </div>
+      )}
+      
+      {/* Show number of crime locations as an overlay */}
+      <div className="absolute top-4 left-4 bg-white bg-opacity-90 p-2 rounded shadow">
+        <p className="text-sm font-medium">{crimeMappedLocations.length} Crime Locations</p>
+      </div>
       
       <div className="absolute bottom-4 right-4">
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -365,6 +413,26 @@ const OfficerCaseMap = () => {
             </form>
           </DialogContent>
         </Dialog>
+      </div>
+      
+      {/* Display a summary of crimes when no actual map */}
+      <div className="absolute bottom-4 left-4 max-w-xs">
+        <div className="bg-white bg-opacity-90 p-3 rounded shadow">
+          <h4 className="font-medium mb-2">Crime Locations</h4>
+          <div className="space-y-1 max-h-32 overflow-y-auto text-sm">
+            {crimeMappedLocations.slice(0, 5).map((location, index) => (
+              <div key={index} className="flex items-start">
+                <MapPin className="h-3 w-3 mt-0.5 mr-1 flex-shrink-0" />
+                <span className="truncate">{location.title}</span>
+              </div>
+            ))}
+            {crimeMappedLocations.length > 5 && (
+              <p className="text-xs text-gray-500 italic">
+                + {crimeMappedLocations.length - 5} more locations
+              </p>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

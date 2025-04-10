@@ -7,7 +7,8 @@ import {
   LogOut,
   Settings,
   User,
-  ChevronDown
+  ChevronDown,
+  FileText
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -58,6 +59,10 @@ const OfficerNavbar = () => {
           <div className="hidden md:flex md:items-center md:space-x-4">
             <Link to="/officer-dashboard" className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">Dashboard</Link>
             <Link to="/officer-dashboard?tab=alerts" className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">Alerts</Link>
+            <Link to="/officer-dashboard?tab=reports" className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium flex items-center">
+              <FileText className="mr-1 h-4 w-4" />
+              Reports
+            </Link>
             <Link to="/officer-dashboard?tab=kyc" className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">KYC</Link>
             <Link to="/officer-dashboard?tab=criminals" className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">Criminals</Link>
             <Link to="/officer-dashboard?tab=map" className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">Map</Link>
@@ -147,6 +152,14 @@ const OfficerNavbar = () => {
             onClick={() => setIsOpen(false)}
           >
             Alerts
+          </Link>
+          <Link 
+            to="/officer-dashboard?tab=reports" 
+            className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 flex items-center"
+            onClick={() => setIsOpen(false)}
+          >
+            <FileText className="mr-2 h-4 w-4" />
+            Reports
           </Link>
           <Link 
             to="/officer-dashboard?tab=kyc" 

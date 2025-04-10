@@ -1,6 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { addMockEvidenceToReports } from './mockEvidenceService';
 
 // Submit a report to officer
 export const submitReportToOfficer = async (reportId: string) => {
@@ -33,7 +34,7 @@ export const submitReportToOfficer = async (reportId: string) => {
       throw error;
     }
     
-    // Create notification in officer_notifications table using type assertion
+    // Create notification in officer_notifications table
     const { error: notificationError } = await supabase
       .from('officer_notifications')
       .insert([
@@ -43,7 +44,7 @@ export const submitReportToOfficer = async (reportId: string) => {
           is_read: false,
           message: 'New crime report submitted for review'
         }
-      ]) as unknown as { data: any; error: any };
+      ]);
     
     if (notificationError) {
       console.error('Error creating notification:', notificationError);
@@ -70,7 +71,12 @@ export const getOfficerReports = async () => {
       throw error;
     }
     
-    return data;
+    // Add mock evidence to reports that don't have any (for demo purposes)
+    const reportsWithEvidence = addMockEvidenceToReports(data || []);
+    
+    console.log("Reports with evidence:", reportsWithEvidence);
+    
+    return reportsWithEvidence;
   } catch (error: any) {
     console.error('Error fetching officer reports:', error);
     throw error;

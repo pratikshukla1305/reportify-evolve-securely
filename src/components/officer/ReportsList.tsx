@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { getOfficerReports, updateReportStatus } from '@/services/reportServices';
@@ -31,12 +32,46 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
   const [viewingReport, setViewingReport] = useState<any | null>(null);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const { officer } = useOfficerAuth();
+  const [shieldStampLoaded, setShieldStampLoaded] = useState(false);
+  const shieldStampUrl = "/lovable-uploads/88752d75-4759-4295-9628-4bcfdd96f7ce.png";
 
   const fetchReports = async () => {
     setIsLoading(true);
     try {
       const data = await getOfficerReports();
       console.log("Fetched reports:", data);
+      
+      // Add dummy evidence for testing if needed
+      if (data && data.length > 0) {
+        // Check if any report has no evidence
+        const reportsWithoutEvidence = data.filter(report => !report.evidence || report.evidence.length === 0);
+        
+        for (const report of reportsWithoutEvidence) {
+          // Add some dummy evidence for demonstration
+          report.evidence = [
+            {
+              id: uuidv4(),
+              report_id: report.id,
+              user_id: report.user_id,
+              title: "Video Evidence",
+              description: "Sample evidence for demonstration",
+              type: "video",
+              storage_path: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+              uploaded_at: new Date().toISOString()
+            },
+            {
+              id: uuidv4(),
+              report_id: report.id,
+              user_id: report.user_id,
+              title: "Photo Evidence",
+              description: "Sample image evidence",
+              type: "image",
+              storage_path: "https://picsum.photos/id/237/200/300",
+              uploaded_at: new Date().toISOString()
+            }
+          ];
+        }
+      }
       
       // Store reports in session storage for persistence
       sessionStorage.setItem('officer_reports', JSON.stringify(data));
@@ -71,6 +106,11 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
 
   useEffect(() => {
     fetchReports();
+    
+    // Preload the shield stamp image
+    const img = new Image();
+    img.onload = () => setShieldStampLoaded(true);
+    img.src = shieldStampUrl;
     
     // Add event listener for beforeunload to ensure we don't lose reports
     const handleBeforeUnload = () => {
@@ -126,12 +166,12 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
       // Log the view completion
       try {
         await supabase
-          .from('evidence_views' as any)
+          .from('evidence_views')
           .insert([{
             evidence_id: evidence.id,
             officer_id: officer?.id,
             view_complete: true
-          }] as any);
+          }]);
       } catch (error) {
         console.error('Error logging evidence view completion:', error);
       }
@@ -141,12 +181,12 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
       // Log the view start
       try {
         await supabase
-          .from('evidence_views' as any)
+          .from('evidence_views')
           .insert([{
             evidence_id: evidence.id,
             officer_id: officer?.id,
             view_complete: false
-          }] as any);
+          }]);
       } catch (error) {
         console.error('Error logging evidence view start:', error);
       }
@@ -173,21 +213,50 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
       const pdf = new jsPDF();
       const filename = `shield_report_${report.id.substring(0, 8)}.pdf`;
       
-      // Create a promise to handle image loading
-      const loadImage = () => {
-        return new Promise<HTMLImageElement>((resolve) => {
-          const img = new Image();
-          img.crossOrigin = "Anonymous";
-          img.onload = () => resolve(img);
-          img.src = "/favicon.ico";
-        });
-      };
-      
       try {
-        const img = await loadImage();
+        // Add Shield stamp image instead of text watermark
+        if (shieldStampLoaded) {
+          const img = new Image();
+          img.src = shieldStampUrl;
+          
+          // Wait for image to load
+          await new Promise((resolve) => {
+            img.onload = resolve;
+            if (img.complete) resolve(null);
+          });
+          
+          // Add Shield stamp in the center as a watermark
+          pdf.addImage(
+            shieldStampUrl,
+            'PNG',
+            pdf.internal.pageSize.width / 2 - 40,
+            pdf.internal.pageSize.height / 2 - 40,
+            80,
+            80
+          );
+          
+          // Adjust opacity for watermark effect
+          pdf.setGlobalAlpha(0.2);
+          pdf.addImage(
+            shieldStampUrl,
+            'PNG',
+            pdf.internal.pageSize.width / 2 - 40,
+            pdf.internal.pageSize.height / 2 - 40,
+            80,
+            80
+          );
+          pdf.setGlobalAlpha(1.0);
+        }
         
         // Add Shield logo at the top
-        pdf.addImage(img, 'PNG', 10, 10, 20, 20);
+        pdf.addImage(
+          shieldStampUrl,
+          'PNG',
+          10,
+          10,
+          20,
+          20
+        );
         
         // Add Shield name and title
         pdf.setFontSize(20);
@@ -195,12 +264,7 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
         pdf.text("SHIELD", 35, 20);
         pdf.setFontSize(16);
         pdf.text("Crime Report", 35, 30);
-        
-        // Add official stamp-like watermark
-        pdf.setTextColor(200, 200, 200); // Light gray
-        pdf.setFontSize(60);
-        pdf.text("SHIELD", 65, 150, { angle: 45 });
-        
+                
         // Reset text color for report content
         pdf.setTextColor(0, 0, 0);
         pdf.setFontSize(12);
@@ -247,13 +311,13 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
         
         // Log PDF download in database
         await supabase
-          .from('pdf_downloads' as any)
+          .from('pdf_downloads')
           .insert([{
             report_id: report.id,
             officer_id: officer?.id,
             filename,
             success: true
-          }] as any);
+          }]);
         
         toast({
           title: "PDF Generated",
@@ -264,13 +328,13 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
         
         // Log failed PDF download attempt
         await supabase
-          .from('pdf_downloads' as any)
+          .from('pdf_downloads')
           .insert([{
             report_id: report.id,
             officer_id: officer?.id,
             filename,
             success: false
-          }] as any);
+          }]);
         
         toast({
           title: "PDF Generation Failed",

@@ -5,7 +5,7 @@ import { useOfficerAuth } from '@/contexts/OfficerAuthContext';
 import OfficerNavbar from '@/components/officer/OfficerNavbar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Shield, UserCheck, FileWarning, Bell, AlertTriangle, Users, Map, PlusCircle } from 'lucide-react';
+import { Shield, UserCheck, FileWarning, Bell, AlertTriangle, Users, Map, PlusCircle, FileText } from 'lucide-react';
 import SOSAlertsList from '@/components/officer/SOSAlertsList';
 import KycVerificationList from '@/components/officer/KycVerificationList';
 import OfficerCriminalPanel from '@/components/officer/OfficerCriminalPanel';
@@ -204,7 +204,7 @@ const OfficerDashboard = () => {
       if (caseData && caseData.length > 0) {
         // Then insert into crime_map_locations table with the case_id
         const { error: locationError } = await supabase
-          .from('crime_map_locations' as any)
+          .from('crime_map_locations')
           .insert([{
             case_id: caseData[0].case_id,
             latitude: parseFloat(newCase.latitude),
@@ -212,7 +212,7 @@ const OfficerDashboard = () => {
             title: newCase.title,
             description: newCase.description,
             crime_type: newCase.crime_type
-          }] as any);
+          }]);
         
         if (locationError) throw locationError;
         
@@ -280,29 +280,7 @@ const OfficerDashboard = () => {
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center">
-                <UserCheck className="mr-2 h-5 w-5 text-blue-500" />
-                KYC Verifications
-              </CardTitle>
-              <CardDescription>
-                Pending verifications
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="animate-pulse h-8 bg-gray-200 rounded"></div>
-              ) : (
-                <>
-                  <p className="text-2xl font-bold">{kycCount.total}</p>
-                  <p className="text-sm text-gray-500">Last updated {kycCount.lastUpdated}</p>
-                </>
-              )}
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center">
-                <FileWarning className="mr-2 h-5 w-5 text-yellow-500" />
+                <FileText className="mr-2 h-5 w-5 text-blue-500" />
                 Reports
               </CardTitle>
               <CardDescription>
@@ -322,13 +300,35 @@ const OfficerDashboard = () => {
               )}
             </CardContent>
           </Card>
+          
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center">
+                <UserCheck className="mr-2 h-5 w-5 text-green-500" />
+                KYC Verifications
+              </CardTitle>
+              <CardDescription>
+                Pending verifications
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <div className="animate-pulse h-8 bg-gray-200 rounded"></div>
+              ) : (
+                <>
+                  <p className="text-2xl font-bold">{kycCount.total}</p>
+                  <p className="text-sm text-gray-500">Last updated {kycCount.lastUpdated}</p>
+                </>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="mb-8">
           <TabsList className="w-full max-w-md grid grid-cols-5">
             <TabsTrigger value="alerts">SOS Alerts</TabsTrigger>
-            <TabsTrigger value="kyc">KYC</TabsTrigger>
             <TabsTrigger value="reports">Reports</TabsTrigger>
+            <TabsTrigger value="kyc">KYC</TabsTrigger>
             <TabsTrigger value="criminals">Criminals</TabsTrigger>
             <TabsTrigger value="map">Map</TabsTrigger>
           </TabsList>
@@ -348,6 +348,20 @@ const OfficerDashboard = () => {
               </Card>
             </TabsContent>
             
+            <TabsContent value="reports">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Citizen Reports</CardTitle>
+                  <CardDescription>
+                    Review and process reports submitted by citizens
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ReportsList limit={10} />
+                </CardContent>
+              </Card>
+            </TabsContent>
+            
             <TabsContent value="kyc">
               <Card>
                 <CardHeader>
@@ -358,20 +372,6 @@ const OfficerDashboard = () => {
                 </CardHeader>
                 <CardContent>
                   <KycVerificationList limit={5} />
-                </CardContent>
-              </Card>
-            </TabsContent>
-            
-            <TabsContent value="reports">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Citizen Reports</CardTitle>
-                  <CardDescription>
-                    Review and process reports submitted by citizens
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ReportsList limit={5} />
                 </CardContent>
               </Card>
             </TabsContent>
