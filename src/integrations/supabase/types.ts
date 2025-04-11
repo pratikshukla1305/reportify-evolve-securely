@@ -54,6 +54,57 @@ export type Database = {
         }
         Relationships: []
       }
+      analysis_videos: {
+        Row: {
+          file_name: string
+          file_size: number | null
+          file_url: string
+          id: string
+          mime_type: string | null
+          report_id: string | null
+          status: string | null
+          thumbnail_url: string | null
+          upload_date: string | null
+        }
+        Insert: {
+          file_name: string
+          file_size?: number | null
+          file_url: string
+          id?: string
+          mime_type?: string | null
+          report_id?: string | null
+          status?: string | null
+          thumbnail_url?: string | null
+          upload_date?: string | null
+        }
+        Update: {
+          file_name?: string
+          file_size?: number | null
+          file_url?: string
+          id?: string
+          mime_type?: string | null
+          report_id?: string | null
+          status?: string | null
+          thumbnail_url?: string | null
+          upload_date?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "analysis_videos_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "crime_reports"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "analysis_videos_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "officer_report_materials"
+            referencedColumns: ["report_id"]
+          },
+        ]
+      }
       cases: {
         Row: {
           address: string
@@ -181,6 +232,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "crime_reports"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crime_report_analysis_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: true
+            referencedRelation: "officer_report_materials"
+            referencedColumns: ["report_id"]
           },
         ]
       }
@@ -355,6 +413,13 @@ export type Database = {
             referencedRelation: "crime_reports"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "evidence_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "officer_report_materials"
+            referencedColumns: ["report_id"]
+          },
         ]
       }
       evidence_views: {
@@ -499,6 +564,13 @@ export type Database = {
             referencedRelation: "crime_reports"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "officer_notifications_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "officer_report_materials"
+            referencedColumns: ["report_id"]
+          },
         ]
       }
       officer_profiles: {
@@ -567,6 +639,13 @@ export type Database = {
             referencedRelation: "crime_reports"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "pdf_downloads_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "officer_report_materials"
+            referencedColumns: ["report_id"]
+          },
         ]
       }
       profiles: {
@@ -631,6 +710,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "crime_reports"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "report_pdfs_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "officer_report_materials"
+            referencedColumns: ["report_id"]
           },
         ]
       }
@@ -748,6 +834,13 @@ export type Database = {
             referencedRelation: "crime_reports"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "user_notifications_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "officer_report_materials"
+            referencedColumns: ["report_id"]
+          },
         ]
       }
       video_analysis_queue: {
@@ -793,6 +886,13 @@ export type Database = {
             referencedRelation: "crime_reports"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "video_analysis_queue_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "officer_report_materials"
+            referencedColumns: ["report_id"]
+          },
         ]
       }
       voice_recordings: {
@@ -826,7 +926,24 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      officer_report_materials: {
+        Row: {
+          pdf_id: string | null
+          pdf_is_official: boolean | null
+          pdf_name: string | null
+          pdf_url: string | null
+          report_id: string | null
+          report_status: string | null
+          report_title: string | null
+          user_id: string | null
+          video_id: string | null
+          video_name: string | null
+          video_size: number | null
+          video_status: string | null
+          video_url: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       record_report_share: {
@@ -844,6 +961,10 @@ export type Database = {
           confirm_password: string
         }
         Returns: Json
+      }
+      update_analysis_video_status: {
+        Args: { p_video_id: string; p_status: string }
+        Returns: undefined
       }
     }
     Enums: {

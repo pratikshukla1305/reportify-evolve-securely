@@ -131,6 +131,7 @@ export const shareReportViaEmail = async (
       return false;
     }
     
+    // Call the edge function to send the email
     const { data, error } = await supabase.functions.invoke('share-report-email', {
       body: { 
         reportId, 

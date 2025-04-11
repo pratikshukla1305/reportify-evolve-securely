@@ -36,6 +36,8 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
   const [viewFullDetailsOpen, setViewFullDetailsOpen] = useState(false);
   const [viewingReport, setViewingReport] = useState<any | null>(null);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [reportVideos, setReportVideos] = useState<{[key: string]: any[]}>({});
+  const [reportPdfs, setReportPdfs] = useState<{[key: string]: any[]}>({});
   const { officer } = useOfficerAuth();
   const [shieldStampLoaded, setShieldStampLoaded] = useState(false);
   const shieldStampUrl = "/lovable-uploads/88752d75-4759-4295-9628-4bcfdd96f7ce.png";
@@ -79,6 +81,8 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
       
       const limitedData = limit ? data.slice(0, limit) : data;
       setReports(limitedData);
+      
+      await fetchReportMedia(limitedData);
     } catch (error: any) {
       console.error("Error fetching reports:", error);
       
@@ -100,6 +104,50 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
       }
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchReportMedia = async (reports: any[]) => {
+    if (!reports || reports.length === 0) return;
+    
+    const reportIds = reports.map(r => r.id);
+    const videosMap: {[key: string]: any[]} = {};
+    const pdfsMap: {[key: string]: any[]} = {};
+    
+    try {
+      const { data: videos, error: videosError } = await supabase
+        .from('analysis_videos')
+        .select('*')
+        .in('report_id', reportIds);
+        
+      if (videosError) {
+        console.error("Error fetching analysis videos:", videosError);
+      } else if (videos) {
+        videos.forEach(video => {
+          if (!videosMap[video.report_id]) videosMap[video.report_id] = [];
+          videosMap[video.report_id].push(video);
+        });
+      }
+      
+      const { data: pdfs, error: pdfsError } = await supabase
+        .from('report_pdfs')
+        .select('*')
+        .in('report_id', reportIds);
+        
+      if (pdfsError) {
+        console.error("Error fetching report PDFs:", pdfsError);
+      } else if (pdfs) {
+        pdfs.forEach(pdf => {
+          if (!pdfsMap[pdf.report_id]) pdfsMap[pdf.report_id] = [];
+          pdfsMap[pdf.report_id].push(pdf);
+        });
+      }
+      
+      setReportVideos(videosMap);
+      setReportPdfs(pdfsMap);
+      
+    } catch (error) {
+      console.error("Error fetching report media:", error);
     }
   };
 
@@ -293,6 +341,103 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
     }
   };
 
+  const renderEvidenceItems = (report: any) => {
+    const standardEvidence = report.evidence || [];
+    const analysisVideos = reportVideos[report.id] || [];
+    const allEvidence = [...standardEvidence];
+    
+    analysisVideos.forEach(video => {
+      const exists = allEvidence.some(ev => 
+        ev.storage_path === video.file_url || 
+        (ev.id && ev.id === video.id)
+      );
+      
+      if (!exists) {
+        allEvidence.push({
+          id: video.id,
+          report_id: video.report_id,
+          type: 'video',
+          storage_path: video.file_url,
+          title: video.file_name || 'Analysis Video',
+          uploaded_at: video.upload_date
+        });
+      }
+    });
+    
+    if (allEvidence.length === 0) return null;
+    
+    return (
+      <div className="mb-4">
+        <p className="text-xs font-medium text-gray-500 uppercase mb-2">Evidence</p>
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+          {allEvidence.map((item: any, index: number) => (
+            <div 
+              key={index} 
+              className="aspect-square bg-gray-100 rounded overflow-hidden cursor-pointer relative" 
+              onClick={() => toggleVideoPreview(item)}
+            >
+              {item.storage_path && (
+                item.type === 'video' || item.storage_path.toLowerCase().includes('video') || item.storage_path.toLowerCase().endsWith('.mp4') ? (
+                  <div className="relative w-full h-full">
+                    <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20">
+                      <Video className="h-8 w-8 text-white" />
+                    </div>
+                  </div>
+                ) : (
+                  <img 
+                    src={item.storage_path} 
+                    alt={`Evidence ${index + 1}`} 
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.onerror = null;
+                      target.src = "/placeholder.svg";
+                    }}
+                  />
+                )
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const renderReportPdfs = (report: any) => {
+    const pdfs = reportPdfs[report.id] || [];
+    if (pdfs.length === 0) return null;
+    
+    return (
+      <div className="mb-4">
+        <p className="text-xs font-medium text-gray-500 uppercase mb-2">Report PDFs</p>
+        <div className="flex flex-wrap gap-2">
+          {pdfs.map((pdf, index) => (
+            <div 
+              key={index}
+              className="border border-gray-200 rounded-md p-2 flex items-center gap-2 bg-gray-50 hover:bg-gray-100 cursor-pointer"
+              onClick={() => {
+                window.open(pdf.file_url, '_blank');
+                if (officer?.id && report.id) {
+                  logPdfDownload(report.id, officer.id.toString(), pdf.file_name, true);
+                }
+              }}
+            >
+              <FileText className="h-5 w-5 text-blue-500" />
+              <div className="flex flex-col">
+                <span className="text-xs font-medium truncate max-w-[120px]">
+                  {pdf.file_name}
+                </span>
+                <span className="text-xs text-gray-400">
+                  {new Date(pdf.created_at).toLocaleDateString()}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center py-8">
@@ -344,36 +489,9 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
               </div>
             )}
             
-            {report.evidence && report.evidence.length > 0 && (
-              <div className="mb-4">
-                <p className="text-xs font-medium text-gray-500 uppercase mb-2">Evidence</p>
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
-                  {report.evidence.map((item: any, index: number) => (
-                    <div 
-                      key={index} 
-                      className="aspect-square bg-gray-100 rounded overflow-hidden cursor-pointer relative" 
-                      onClick={() => toggleVideoPreview(item)}
-                    >
-                      {item.storage_path && (
-                        item.type === 'video' || item.storage_path.toLowerCase().includes('video') || item.storage_path.toLowerCase().endsWith('.mp4') ? (
-                          <div className="relative w-full h-full">
-                            <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20">
-                              <Video className="h-8 w-8 text-white" />
-                            </div>
-                          </div>
-                        ) : (
-                          <img 
-                            src={item.storage_path} 
-                            alt={`Evidence ${index + 1}`} 
-                            className="w-full h-full object-cover"
-                          />
-                        )
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            {renderEvidenceItems(report)}
+            
+            {renderReportPdfs(report)}
             
             {activePreview && (
               <div 
@@ -385,7 +503,17 @@ const ReportsList: React.FC<ReportsListProps> = ({ limit }) => {
                     src={activePreview} 
                     controls 
                     autoPlay 
-                    className="w-full rounded-lg shadow-lg" 
+                    className="w-full rounded-lg shadow-lg"
+                    onError={(e) => {
+                      console.error("Video preview error:", e);
+                      const target = e.target as HTMLVideoElement;
+                      target.onerror = null;
+                      toast({
+                        title: "Video Error",
+                        description: "Could not play this video format.",
+                        variant: "destructive"
+                      });
+                    }}
                   />
                   <div className="flex justify-end mt-4">
                     <Button 

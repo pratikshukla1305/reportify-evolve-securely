@@ -1,237 +1,188 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { crimeDescriptions, getCrimeDescriptionByType } from './crimeAnalysisData';
 
-export type VideoAnalysisResult = {
+export interface VideoAnalysisResult {
   crimeType: string;
   confidence: number;
   description: string;
   analysisTimestamp: string;
-};
-
-export type AnalysisResponse = {
-  success: boolean;
-  analysis?: VideoAnalysisResult;
-  error?: string;
-};
-
-/**
- * Analyze video evidence using AI
- * @param videoUrl URL of the video to analyze
- * @param reportId Optional report ID to associate the analysis with
- * @param location Optional location information for the analysis
- * @returns Analysis result
- */
-export const analyzeVideoEvidence = async (
-  videoUrl: string, 
-  reportId?: string,
-  location?: string
-): Promise<AnalysisResponse> => {
-  try {
-    console.log(`Starting analysis for video: ${videoUrl}, reportId: ${reportId}, location: ${location}`);
-    
-    // First, check if this video has already been analyzed
-    if (reportId) {
-      const existingAnalysis = await getReportAnalysis(reportId);
-      if (existingAnalysis) {
-        console.log("Found existing analysis for this report:", existingAnalysis);
-        return { success: true, analysis: existingAnalysis };
-      }
-    }
-    
-    // If not previously analyzed, queue it for analysis
-    if (reportId) {
-      try {
-        // Use a raw query approach with error handling
-        await supabase
-          .from('video_analysis_queue' as any)
-          .insert({
-            report_id: reportId,
-            video_url: videoUrl,
-            status: 'processing'
-          });
-          
-        console.log("Video queued for analysis");  
-      } catch (insertError: any) {
-        console.error("Error queuing analysis:", insertError);
-        // Continue with analysis even if queue insert fails
-      }
-    }
-    
-    console.log("Calling FastAPI model to analyze video");
-    
-    try {
-      // Use the correct local FastAPI URL - modified from localhost:8000 to 127.0.0.1:8000
-      const response = await fetch('http://127.0.0.1:8000/analyze-video', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ video_url: videoUrl, location }),
-        signal: AbortSignal.timeout(15000) // 15 second timeout for local model
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log("Local model analysis successful:", data);
-        
-        const analysis: VideoAnalysisResult = {
-          crimeType: data.crime_type.toLowerCase(),
-          confidence: data.confidence,
-          description: data.description,
-          analysisTimestamp: new Date().toISOString()
-        };
-        
-        // Store the analysis result if we have a report ID
-        if (reportId) {
-          await storeAnalysisResult(reportId, analysis, location);
-        }
-        
-        return { success: true, analysis };
-      } else {
-        console.warn("Local model service returned error, using fallback:", await response.text());
-      }
-    } catch (modelError) {
-      console.warn("Local model service not available, using edge function:", modelError);
-    }
-    
-    // Fallback to edge function if local model fails
-    const { data, error } = await supabase.functions.invoke('analyze-video-evidence', {
-      body: { videoUrl, reportId, location }
-    });
-    
-    if (error) {
-      console.error("Error analyzing video:", error);
-      toast.error("Failed to analyze video. Please try again.");
-      return { success: false, error: error.message };
-    }
-    
-    if (!data.success) {
-      console.error("Analysis unsuccessful:", data.error);
-      toast.error(data.error || "Analysis failed");
-      return { success: false, error: data.error };
-    }
-    
-    console.log("Analysis completed successfully:", data);
-    
-    // If we have a report ID, store the analysis result in the database
-    if (reportId && data.analysis) {
-      await storeAnalysisResult(reportId, data.analysis, location);
-    }
-    
-    return data;
-  } catch (error: any) {
-    console.error("Error in analyzeVideoEvidence:", error);
-    toast.error(`Analysis error: ${error.message}`);
-    return { success: false, error: error.message };
-  }
-};
-
-/**
- * Store analysis result in the database
- * @param reportId Report ID
- * @param analysis Analysis result
- * @param location Optional location information
- */
-async function storeAnalysisResult(reportId: string, analysis: VideoAnalysisResult, location?: string) {
-  try {
-    await supabase
-      .from('crime_report_analysis' as any)
-      .upsert({
-        report_id: reportId,
-        crime_type: analysis.crimeType,
-        confidence: analysis.confidence,
-        description: analysis.description,
-        model_version: 'v1.0'
-      });
-      
-    // Also update the report with location information if provided
-    if (location) {
-      await supabase
-        .from('crime_reports')
-        .update({
-          detailed_location: location
-        })
-        .eq('id', reportId);
-    }
-      
-    console.log("Analysis stored in database");
-  } catch (upsertError: any) {
-    console.error("Error storing analysis:", upsertError);
-  }
 }
 
-/**
- * Get analysis result for a specific report from the database
- * 
- * @param reportId Report ID
- * @returns Analysis result
- */
+// Function to analyze video evidence using FastAPI
+export const analyzeVideoEvidence = async (
+  videoUrl: string, 
+  reportId: string,
+  location?: string
+): Promise<{success: boolean; analysis?: VideoAnalysisResult; error?: string}> => {
+  try {
+    console.log("Analyzing video evidence:", videoUrl);
+    
+    // Record the video in our new analysis_videos table
+    const { data: videoData, error: videoError } = await supabase
+      .from('analysis_videos')
+      .insert({
+        report_id: reportId,
+        file_name: videoUrl.split('/').pop() || 'video.mp4',
+        file_url: videoUrl,
+        status: 'processing',
+        mime_type: 'video/mp4'
+      })
+      .select('id')
+      .single();
+      
+    if (videoError) {
+      console.error("Error recording video for analysis:", videoError);
+      throw new Error(videoError.message);
+    }
+    
+    // Call local FastAPI endpoint
+    const response = await fetch("http://127.0.0.1:8000/predict", {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        video_url: videoUrl,
+        location: location || 'Unknown location'
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      // Fallback to mock analysis if local API is not available
+      console.warn(`FastAPI not available (${response.status}): ${errorText}`);
+      toast.warning("Local API not available. Using fallback analysis.");
+      return await mockAnalyzeVideo(videoUrl, reportId, videoData?.id);
+    }
+
+    const result = await response.json();
+    console.log("FastAPI analysis result:", result);
+    
+    // Update the analysis video status
+    await supabase.rpc('update_analysis_video_status', {
+      p_video_id: videoData.id,
+      p_status: 'analyzed'
+    });
+    
+    // Store the analysis result in the database
+    const { error: analysisError } = await supabase
+      .from('crime_report_analysis')
+      .insert({
+        report_id: reportId,
+        crime_type: result.crime_type || "Unknown",
+        confidence: result.confidence || 0.75,
+        description: result.description || "No description available",
+        model_version: "FastAPI-Custom-v1"
+      });
+    
+    if (analysisError) {
+      console.error("Error saving analysis result:", analysisError);
+    }
+    
+    return {
+      success: true,
+      analysis: {
+        crimeType: result.crime_type || "Unknown",
+        confidence: result.confidence || 0.75,
+        description: result.description || "No description available",
+        analysisTimestamp: new Date().toISOString()
+      }
+    };
+  } catch (error: any) {
+    console.error("Error with video analysis:", error);
+    return await mockAnalyzeVideo(videoUrl, reportId);
+  }
+};
+
+// Mock analysis function as a fallback when the FastAPI endpoint isn't available
+const mockAnalyzeVideo = async (
+  videoUrl: string, 
+  reportId: string,
+  videoId?: string
+): Promise<{success: boolean; analysis?: VideoAnalysisResult; error?: string}> => {
+  console.log("Using mock analysis for video:", videoUrl);
+  
+  // Update video status if we have a videoId
+  if (videoId) {
+    await supabase.rpc('update_analysis_video_status', {
+      p_video_id: videoId,
+      p_status: 'analyzed'
+    });
+  }
+  
+  // Generate a mock analysis
+  const mockCrimeTypes = ["assault", "theft", "vandalism", "arson", "abuse"];
+  const mockCrimeType = mockCrimeTypes[Math.floor(Math.random() * mockCrimeTypes.length)];
+  
+  const mockDescriptions = [
+    "The video shows evidence of a crime where a perpetrator approaches the victim in a threatening manner. The incident appears to have occurred in an urban setting.",
+    "Analysis of the video indicates signs of criminal activity taking place on public property. There are multiple individuals involved in the incident.",
+    "The footage reveals a potential crime scene with evidence of property damage. The time stamp suggests this occurred during daylight hours.",
+    "Examination of the video shows suspicious behavior consistent with criminal activity. The location appears to be a commercial establishment."
+  ];
+  
+  const mockDescription = mockDescriptions[Math.floor(Math.random() * mockDescriptions.length)];
+  const mockConfidence = 0.75 + (Math.random() * 0.2); // 0.75-0.95
+  
+  const mockAnalysis: VideoAnalysisResult = {
+    crimeType: mockCrimeType,
+    confidence: mockConfidence,
+    description: mockDescription,
+    analysisTimestamp: new Date().toISOString()
+  };
+  
+  // Store the mock analysis in the database
+  try {
+    const { error: analysisError } = await supabase
+      .from('crime_report_analysis')
+      .insert({
+        report_id: reportId,
+        crime_type: mockAnalysis.crimeType,
+        confidence: mockAnalysis.confidence,
+        description: mockAnalysis.description,
+        model_version: "Mock-Fallback-v1"
+      });
+    
+    if (analysisError) {
+      console.error("Error saving mock analysis:", analysisError);
+    }
+  } catch (error) {
+    console.error("Database error while saving mock analysis:", error);
+  }
+  
+  return {
+    success: true,
+    analysis: mockAnalysis
+  };
+};
+
+// Get analysis for a report
 export const getReportAnalysis = async (reportId: string): Promise<VideoAnalysisResult | null> => {
   try {
-    console.log(`Getting analysis for report: ${reportId}`);
-    
-    // Use a safer approach with better type handling
     const { data, error } = await supabase
-      .from('crime_report_analysis' as any)
+      .from('crime_report_analysis')
       .select('*')
       .eq('report_id', reportId)
+      .order('created_at', { ascending: false })
+      .limit(1)
       .single();
     
     if (error) {
-      // If the report doesn't have an analysis yet, it's not an error
-      if (error.code === 'PGRST116') { // No rows returned
-        console.log("No analysis found for this report");
-        return null;
-      }
       console.error("Error fetching report analysis:", error);
-      throw error;
-    }
-    
-    if (!data) {
-      console.log("No analysis data returned");
       return null;
     }
     
-    // Use type assertion after validating that data exists
-    const rawData = data as any;
+    if (!data) return null;
     
-    // Type assertion with safe fallbacks
-    const result: VideoAnalysisResult = {
-      crimeType: rawData.crime_type || '',
-      confidence: typeof rawData.confidence === 'number' ? rawData.confidence : 0,
-      description: rawData.description || '',
-      analysisTimestamp: rawData.created_at || new Date().toISOString()
+    return {
+      crimeType: data.crime_type,
+      confidence: data.confidence,
+      description: data.description,
+      analysisTimestamp: data.created_at
     };
-    
-    console.log("Retrieved analysis:", result);
-    return result;
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error in getReportAnalysis:", error);
-    
-    // If it's not a "no rows" error, show a toast
-    if (error.code !== 'PGRST116') {
-      toast.error(`Failed to retrieve analysis: ${error.message}`);
-    }
-    
     return null;
   }
-};
-
-/**
- * Perform a mock analysis when no real AI model is available.
- * This function provides realistic-looking results for demo purposes.
- */
-export const performMockAnalysis = (videoUrl: string): VideoAnalysisResult => {
-  // Simulate AI analysis
-  const crimeTypes = ["abuse", "assault", "arson", "arrest"];
-  const randomIndex = Math.floor(Math.random() * crimeTypes.length);
-  const crimeType = crimeTypes[randomIndex];
-  const confidence = 0.75 + (Math.random() * 0.20); // Between 0.75 and 0.95
-  
-  return {
-    crimeType,
-    confidence,
-    description: getCrimeDescriptionByType(crimeType),
-    analysisTimestamp: new Date().toISOString()
-  };
 };

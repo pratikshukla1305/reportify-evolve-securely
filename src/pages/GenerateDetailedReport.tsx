@@ -30,6 +30,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import jsPDF from 'jspdf';
+import { supabase } from '@/services/supabase';
 
 const SHIELD_LOGO_URL = '/logo.jpg';
 
@@ -91,9 +92,29 @@ const GenerateDetailedReport = () => {
     
     const savedImages = sessionStorage.getItem('uploadedImages');
     if (savedImages) {
-      setUploadedImages(JSON.parse(savedImages));
+      const images = JSON.parse(savedImages);
+      setUploadedImages(images);
+      console.log("Loaded images from session storage:", images);
+    }
+    
+    if (id) {
+      fetchExistingAnalysis(id);
     }
   }, [location.search]);
+  
+  const fetchExistingAnalysis = async (reportId: string) => {
+    try {
+      const result = await getReportAnalysis(reportId);
+      if (result) {
+        console.log("Found existing analysis:", result);
+        setAnalysisResult(result);
+        setIsComplete(true);
+        setAnalysisProgress(100);
+      }
+    } catch (error) {
+      console.error("Error fetching existing analysis:", error);
+    }
+  };
   
   const simulateProgress = () => {
     let progress = 0;
@@ -128,6 +149,11 @@ const GenerateDetailedReport = () => {
         console.log("Analyzing video evidence:", uploadedImages[0]);
         const videoUrl = uploadedImages[0];
         
+        await supabase
+          .from('crime_reports')
+          .update({ detailed_location: formData.location })
+          .eq('id', reportId);
+        
         const result = await analyzeVideoEvidence(videoUrl, reportId, formData.location);
         
         if (result.success && result.analysis) {
@@ -160,26 +186,27 @@ const GenerateDetailedReport = () => {
     try {
       const doc = new jsPDF();
       
-      const logoResponse = await fetch(SHIELD_LOGO_URL);
-      const logoBlob = await logoResponse.blob();
-      const logoURL = URL.createObjectURL(logoBlob);
-      
-      const img = new Image();
-      img.src = logoURL;
-      
-      await new Promise((resolve) => {
-        img.onload = resolve;
-      });
+      try {
+        const logoResponse = await fetch(SHIELD_LOGO_URL);
+        const logoBlob = await logoResponse.blob();
+        const logoURL = URL.createObjectURL(logoBlob);
+        
+        const img = new Image();
+        img.src = logoURL;
+        
+        await new Promise((resolve) => {
+          img.onload = resolve;
+          if (img.complete) resolve(null);
+        });
+        
+        doc.addImage(logoURL, 'JPEG', 95, 25, 20, 20);
+      } catch (logoError) {
+        console.error("Error adding logo to PDF:", logoError);
+      }
       
       doc.setFontSize(22);
       doc.setTextColor(0, 51, 102);
       doc.text("SHIELD", 105, 20, { align: "center" });
-      
-      try {
-        doc.addImage(img, 'PNG', 95, 25, 20, 20);
-      } catch (logoError) {
-        console.error("Error adding logo to PDF:", logoError);
-      }
       
       doc.setFontSize(18);
       doc.setTextColor(0, 0, 0);
@@ -207,7 +234,7 @@ const GenerateDetailedReport = () => {
         doc.setTextColor(0, 51, 102);
         doc.text("Incident Description:", 20, 130);
         
-        const descriptionLines = analysisResult.description.split('\n');
+        const descriptionLines = doc.splitTextToSize(analysisResult.description, 170);
         let yPosition = 140;
         
         doc.setFontSize(10);
@@ -228,21 +255,16 @@ const GenerateDetailedReport = () => {
         doc.text("No analysis data available", 20, 105);
       }
       
-      if (doc.context2d) {
-        const currentAlpha = doc.context2d.globalAlpha;
-        doc.context2d.globalAlpha = 0.2;
-        try {
-          doc.addImage(img, 'PNG', 60, 120, 80, 80);
-        } catch (watermarkError) {
-          console.error("Error adding watermark to PDF:", watermarkError);
+      try {
+        const watermarkURL = SHIELD_LOGO_URL;
+        if (doc.context2d) {
+          const currentAlpha = doc.context2d.globalAlpha;
+          doc.context2d.globalAlpha = 0.2;
+          doc.addImage(watermarkURL, 'JPEG', 60, 120, 80, 80);
+          doc.context2d.globalAlpha = currentAlpha;
         }
-        doc.context2d.globalAlpha = currentAlpha;
-      } else {
-        try {
-          doc.addImage(img, 'PNG', 60, 120, 80, 80);
-        } catch (watermarkError) {
-          console.error("Error adding watermark to PDF:", watermarkError);
-        }
+      } catch (watermarkError) {
+        console.error("Error adding watermark to PDF:", watermarkError);
       }
       
       doc.setFontSize(8);
@@ -252,20 +274,27 @@ const GenerateDetailedReport = () => {
       const pdfBlob = doc.output('blob');
       
       const fileName = `Shield-Crime-Report-${reportId}.pdf`;
+      
       if (reportId) {
+        console.log("Saving PDF to database for report:", reportId);
         const fileUrl = await saveReportPdf(reportId, pdfBlob, fileName, false);
+        
         if (fileUrl) {
           setPdfUrl(fileUrl);
-          const pdfObjectURL = URL.createObjectURL(pdfBlob);
-          window.open(pdfObjectURL, '_blank');
+          console.log("PDF saved with URL:", fileUrl);
+          
+          const objectUrl = URL.createObjectURL(pdfBlob);
+          
+          const link = document.createElement('a');
+          link.href = objectUrl;
+          link.download = fileName;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
         }
+      } else {
+        console.error("Cannot save PDF: No report ID available");
       }
-      
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(pdfBlob);
-      link.download = fileName;
-      document.body.appendChild(link);
-      document.body.removeChild(link);
       
       toast.success("PDF downloaded successfully");
     } catch (error: any) {
@@ -301,11 +330,24 @@ const GenerateDetailedReport = () => {
   };
   
   const handleEmailShare = async (formData: z.infer<typeof emailFormSchema>) => {
-    if (!pdfUrl) {
-      toast.info("Generating PDF report...");
+    let currentPdfUrl = pdfUrl;
+    
+    if (!currentPdfUrl) {
+      toast.info("Generating PDF report first...");
       
       try {
         await generatePDF();
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        currentPdfUrl = pdfUrl;
+        
+        if (!currentPdfUrl) {
+          const pdfs = await getReportPdfs(reportId!);
+          if (pdfs && pdfs.length > 0) {
+            currentPdfUrl = pdfs[0].file_url;
+            setPdfUrl(currentPdfUrl);
+            console.log("Using existing PDF URL:", currentPdfUrl);
+          }
+        }
       } catch (error) {
         toast.error("Failed to generate PDF. Please try again.");
         return;
@@ -317,10 +359,19 @@ const GenerateDetailedReport = () => {
       return;
     }
     
+    if (!currentPdfUrl) {
+      toast.error("Could not generate or find a PDF to share");
+      return;
+    }
+    
     setIsSharingEmail(true);
     
     try {
-      const currentPdfUrl = pdfUrl || "";
+      console.log("Sharing report via email:", {
+        reportId,
+        pdfUrl: currentPdfUrl,
+        email: formData.email
+      });
       
       const success = await shareReportViaEmail(
         reportId,
@@ -339,6 +390,7 @@ const GenerateDetailedReport = () => {
     } catch (error) {
       console.error("Error sharing via email:", error);
       toast.error("Failed to send email. Please try again.");
+    } finally {
       setIsSharingEmail(false);
     }
   };
@@ -456,18 +508,13 @@ const GenerateDetailedReport = () => {
              url.toLowerCase().endsWith('.mov') || 
              url.toLowerCase().includes('video') ? (
               <>
-                <video 
-                  src={url} 
-                  controls 
-                  className="w-full h-full object-cover"
-                  poster="/placeholder.svg"
-                  onClick={() => setSelectedVideo(url)}
-                  onError={(e) => console.error("Video loading error:", e)}
-                  preload="metadata"
-                >
-                  <source src={url} type="video/mp4" />
-                  Your browser does not support the video tag.
-                </video>
+                <div className="w-full h-full bg-gray-200 flex items-center justify-center cursor-pointer"
+                     onClick={() => setSelectedVideo(url)}>
+                  <div className="flex flex-col items-center">
+                    <Video className="h-16 w-16 text-gray-500" />
+                    <span className="mt-2 text-sm text-gray-600">Click to play video</span>
+                  </div>
+                </div>
                 <div className="absolute bottom-0 right-0 bg-black bg-opacity-70 text-white text-xs p-1 rounded-tl">
                   Video {index + 1}
                 </div>
@@ -477,7 +524,12 @@ const GenerateDetailedReport = () => {
                 src={url} 
                 alt={`Evidence ${index + 1}`} 
                 className="w-full h-full object-cover"
-                onError={(e) => console.error("Image loading error:", e)}
+                onError={(e) => {
+                  console.error("Image loading error:", e);
+                  const target = e.target as HTMLImageElement;
+                  target.onerror = null; // Prevent infinite error loops
+                  target.src = "/placeholder.svg";
+                }}
               />
             )}
           </div>
@@ -507,16 +559,38 @@ const GenerateDetailedReport = () => {
               controls
               autoPlay
               className="w-full h-full"
-              onError={(e) => console.error("Modal video loading error:", e)}
+              onError={(e) => {
+                console.error("Modal video loading error:", e);
+                const target = e.target as HTMLVideoElement;
+                target.onerror = null; // Prevent infinite error loops
+                target.poster = "/placeholder.svg";
+              }}
             >
               <source src={selectedVideo} type="video/mp4" />
               Your browser does not support the video tag.
             </video>
           </div>
           <div className="mt-4">
-            <p className="text-xs text-gray-500">
+            <p className="text-sm text-gray-500">
               If the video doesn't play, it may be in an unsupported format or the URL may be inaccessible.
+              Try downloading the video to view it locally.
             </p>
+            <div className="mt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const a = document.createElement('a');
+                  a.href = selectedVideo;
+                  a.download = "video-evidence.mp4";
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                }}
+              >
+                <Download className="mr-2 h-4 w-4" /> Download Video
+              </Button>
+            </div>
           </div>
         </div>
       </div>
