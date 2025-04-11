@@ -26,6 +26,7 @@ const NavbarWithNotifications = () => {
             <Link to="/advisories" className="text-gray-500 hover:text-shield-blue transition-colors">Advisories</Link>
             <Link to="/help-us" className="text-gray-500 hover:text-shield-blue transition-colors">Help Us</Link>
             <Link to="/about" className="text-gray-500 hover:text-shield-blue transition-colors">About</Link>
+            <Link to="/my-reports" className="text-gray-500 hover:text-shield-blue transition-colors">My Reports</Link>
           </div>
           
           <div className="flex items-center space-x-4">

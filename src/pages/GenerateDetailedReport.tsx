@@ -66,6 +66,7 @@ const GenerateDetailedReport = () => {
   const [analysisStep, setAnalysisStep] = useState<string>('preparing');
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [isSharingEmail, setIsSharingEmail] = useState(false);
+  const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
   
   // Form for location input
   const locationForm = useForm<z.infer<typeof locationFormSchema>>({
@@ -441,6 +442,7 @@ const GenerateDetailedReport = () => {
                 controls 
                 className="w-full h-full object-cover"
                 poster="/placeholder.svg"
+                onClick={() => setSelectedVideo(url)}
               />
             ) : (
               <img 
@@ -451,6 +453,34 @@ const GenerateDetailedReport = () => {
             )}
           </div>
         ))}
+      </div>
+    );
+  };
+  
+  const renderVideoModal = () => {
+    if (!selectedVideo) return null;
+    
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75">
+        <div className="bg-white rounded-lg p-4 max-w-4xl w-full">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-medium">Video Evidence</h3>
+            <Button 
+              variant="ghost" 
+              onClick={() => setSelectedVideo(null)}
+            >
+              X
+            </Button>
+          </div>
+          <div className="aspect-video w-full">
+            <video 
+              src={selectedVideo} 
+              controls
+              autoPlay
+              className="w-full h-full"
+            />
+          </div>
+        </div>
       </div>
     );
   };
@@ -526,6 +556,8 @@ const GenerateDetailedReport = () => {
   return (
     <div className="min-h-screen bg-white">
       <Navbar />
+      
+      {selectedVideo && renderVideoModal()}
       
       <section className="pt-24 pb-16">
         <div className="container max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
