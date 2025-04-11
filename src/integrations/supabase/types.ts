@@ -829,6 +829,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      record_report_share: {
+        Args: { p_report_id: string; p_shared_to: string; p_share_type: string }
+        Returns: undefined
+      }
       register_officer: {
         Args: {
           full_name: string

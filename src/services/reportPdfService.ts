@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { v4 as uuidv4 } from 'uuid';
@@ -151,8 +152,7 @@ export const shareReportViaEmail = async (
       return false;
     }
     
-    // Record the email sharing in the database using a raw SQL query instead
-    // since the TypeScript types haven't been updated yet
+    // Record the email sharing in the database using the RPC function we created
     try {
       const { error: shareError } = await supabase.rpc(
         'record_report_share',

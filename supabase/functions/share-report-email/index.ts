@@ -109,7 +109,7 @@ serve(async (req) => {
       ]
     });
 
-    // Record the email sharing directly in the database using SQL
+    // Record the email sharing in the database using SQL
     // This edge function has admin privileges
     const { error: insertError } = await supabase
       .from("report_shares")
