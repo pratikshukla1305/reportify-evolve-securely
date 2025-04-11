@@ -11,10 +11,31 @@ export const useFileUpload = () => {
   const [isUploading, setIsUploading] = useState(false);
   
   const addFiles = (newFiles: File[]) => {
-    setFiles(prev => [...prev, ...newFiles]);
+    // Validate file types
+    const validFiles = newFiles.filter(file => {
+      const isValid = file.type.startsWith('video/') || file.type.startsWith('image/');
+      if (!isValid) {
+        toast.error(`${file.name} is not a valid video or image file`);
+      }
+      return isValid;
+    });
+    
+    // Validate file sizes
+    const maxSize = 100 * 1024 * 1024; // 100MB
+    const sizeValidFiles = validFiles.filter(file => {
+      const isValidSize = file.size <= maxSize;
+      if (!isValidSize) {
+        toast.error(`${file.name} exceeds the maximum file size (100MB)`);
+      }
+      return isValidSize;
+    });
+    
+    if (sizeValidFiles.length === 0) return;
+    
+    setFiles(prev => [...prev, ...sizeValidFiles]);
     
     // Create preview URLs
-    newFiles.forEach(file => {
+    sizeValidFiles.forEach(file => {
       const reader = new FileReader();
       reader.onloadend = () => {
         setPreviews(prev => [...prev, reader.result as string]);
@@ -25,10 +46,12 @@ export const useFileUpload = () => {
       simulateFileUpload(file.name);
     });
     
-    toast.success(`${newFiles.length} file(s) added successfully`);
+    toast.success(`${sizeValidFiles.length} file(s) added successfully`);
   };
   
   const removeFile = (index: number) => {
+    if (index < 0 || index >= files.length) return;
+    
     const fileName = files[index].name;
     
     setFiles(files.filter((_, i) => i !== index));
@@ -54,10 +77,12 @@ export const useFileUpload = () => {
         clearInterval(interval);
         
         // Check if all files are uploaded
-        const allUploaded = Object.values(uploadProgress).every(p => p === 100);
-        if (allUploaded) {
-          setIsUploading(false);
-        }
+        setTimeout(() => {
+          const allUploaded = Object.values(uploadProgress).every(p => p === 100);
+          if (allUploaded) {
+            setIsUploading(false);
+          }
+        }, 500);
       }
       setUploadProgress(prev => ({
         ...prev,

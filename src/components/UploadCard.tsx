@@ -42,31 +42,40 @@ const UploadCard = ({ className }: UploadCardProps) => {
     }
     
     setIsUploading(true);
+    toast.info("Uploading files and creating report...");
     
     try {
+      console.log("Starting file upload process...");
       // Upload files to Supabase storage
       const uploadedUrls = await uploadFilesToSupabase(files, user.id);
       
       if (uploadedUrls.length === 0) {
         toast.error("Failed to upload files. Please try again.");
+        setIsUploading(false);
         return;
       }
+      
+      console.log("Files uploaded successfully, URLs:", uploadedUrls);
       
       // Store preview URLs in sessionStorage to use in report
       sessionStorage.setItem('uploadedImages', JSON.stringify(uploadedUrls));
       
       // Create a draft report
       const reportId = uuidv4();
+      console.log("Creating draft report with ID:", reportId);
       const success = await createDraftReport(user.id, reportId, uploadedUrls);
       
       if (success) {
+        toast.success("Files uploaded and report created successfully!");
         // Navigate to continue report page
         navigate(`/continue-report?id=${reportId}`);
+      } else {
+        toast.error("Failed to create report. Please try again.");
       }
       
     } catch (error: any) {
       console.error('Error creating report:', error);
-      toast.error(`Error: ${error.message}`);
+      toast.error(`Error: ${error.message || "Unknown error occurred"}`);
     } finally {
       setIsUploading(false);
     }
