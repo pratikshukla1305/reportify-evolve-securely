@@ -64,7 +64,7 @@ export const saveReportPdf = async (
     console.log(`PDF public URL: ${fileUrl}`);
     
     // Store PDF record in database
-    const { error: dbError } = await supabase
+    const { data: pdfData, error: dbError } = await supabase
       .from('report_pdfs')
       .insert({
         report_id: reportId,
@@ -72,11 +72,43 @@ export const saveReportPdf = async (
         file_url: fileUrl,
         file_size: pdfBlob.size,
         is_official: isOfficial
-      });
+      })
+      .select('id')
+      .single();
     
     if (dbError) {
       console.error("Error storing PDF record:", dbError);
       throw dbError;
+    }
+    
+    // Also store in officer_report_materials table for officer access
+    try {
+      const { data: reportData } = await supabase
+        .from('crime_reports')
+        .select('user_id, title, status')
+        .eq('id', reportId)
+        .single();
+        
+      if (reportData) {
+        const { error: materialsError } = await supabase
+          .from('officer_report_materials')
+          .insert({
+            report_id: reportId,
+            pdf_id: pdfData.id,
+            pdf_name: fileName,
+            pdf_url: fileUrl,
+            pdf_is_official: isOfficial,
+            report_title: reportData.title,
+            report_status: reportData.status,
+            user_id: reportData.user_id
+          });
+          
+        if (materialsError) {
+          console.error("Error adding to officer materials:", materialsError);
+        }
+      }
+    } catch (err) {
+      console.error("Error getting report data:", err);
     }
     
     toast.success("PDF saved successfully");
@@ -191,5 +223,91 @@ export const shareReportViaEmail = async (
     console.error("Error in shareReportViaEmail:", error);
     toast.error("Failed to share report: " + (error.message || "Unknown error"));
     return false;
+  }
+};
+
+/**
+ * Get officer report materials including PDFs
+ * 
+ * @param reportId Report ID
+ * @returns List of officer report materials
+ */
+export const getOfficerReportMaterials = async (reportId: string): Promise<any[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('officer_report_materials')
+      .select('*')
+      .eq('report_id', reportId)
+      .order('created_at', { ascending: false });
+      
+    if (error) {
+      console.error("Error fetching officer report materials:", error);
+      throw error;
+    }
+    
+    return data || [];
+  } catch (error) {
+    console.error("Error in getOfficerReportMaterials:", error);
+    return [];
+  }
+};
+
+/**
+ * Apply Shield watermark to PDF
+ * 
+ * @param pdf PDF document
+ * @param watermarkUrl URL or path to the watermark image
+ */
+export const applyShieldWatermark = async (pdf: any, watermarkUrl: string): Promise<void> => {
+  try {
+    // Create a canvas to manipulate the watermark
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    if (!ctx) {
+      console.error("Could not get canvas context for watermark");
+      return;
+    }
+    
+    // Load the watermark image
+    const img = new Image();
+    img.src = watermarkUrl;
+    
+    await new Promise((resolve) => {
+      img.onload = resolve;
+      if (img.complete) resolve(null);
+    });
+    
+    // Set canvas dimensions
+    canvas.width = img.width;
+    canvas.height = img.height;
+    
+    // Draw image and adjust transparency
+    ctx.globalAlpha = 0.2; // Set transparency
+    ctx.drawImage(img, 0, 0);
+    
+    // Convert to data URL
+    const transparentWatermark = canvas.toDataURL('image/png');
+    
+    // Add transparent watermark to center of each page
+    const pageCount = pdf.internal.getNumberOfPages();
+    
+    for (let i = 1; i <= pageCount; i++) {
+      pdf.setPage(i);
+      const pageWidth = pdf.internal.pageSize.width;
+      const pageHeight = pdf.internal.pageSize.height;
+      
+      // Add watermark to center of page
+      pdf.addImage(
+        transparentWatermark,
+        'PNG',
+        pageWidth / 2 - 40,
+        pageHeight / 2 - 40,
+        80,
+        80
+      );
+    }
+  } catch (error) {
+    console.error("Error applying watermark:", error);
   }
 };

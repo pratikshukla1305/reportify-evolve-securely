@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -27,7 +26,7 @@ import {
   FormMessage 
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { saveReportPdf, shareReportViaEmail, getReportPdfs } from '@/services/reportPdfService';
+import { saveReportPdf, shareReportViaEmail, getReportPdfs, applyShieldWatermark } from '@/services/reportPdfService';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -189,21 +188,19 @@ const GenerateDetailedReport = () => {
       const doc = new jsPDF();
       
       try {
-        const logoResponse = await fetch(SHIELD_LOGO_URL);
-        const logoBlob = await logoResponse.blob();
-        const logoURL = URL.createObjectURL(logoBlob);
-        
-        const img = new Image();
-        img.src = logoURL;
+        const logoImg = new Image();
+        logoImg.src = SHIELD_LOGO_URL;
         
         await new Promise((resolve) => {
-          img.onload = resolve;
-          if (img.complete) resolve(null);
+          logoImg.onload = resolve;
+          if (logoImg.complete) resolve(null);
         });
         
-        doc.addImage(logoURL, 'JPEG', 95, 25, 20, 20);
+        doc.addImage(logoImg.src, 'JPEG', 95, 25, 20, 20);
+        console.log("Shield logo loaded successfully");
       } catch (logoError) {
         console.error("Error adding logo to PDF:", logoError);
+        toast.error("Could not add logo to PDF");
       }
       
       doc.setFontSize(22);
@@ -258,13 +255,7 @@ const GenerateDetailedReport = () => {
       }
       
       try {
-        const watermarkURL = SHIELD_LOGO_URL;
-        if (doc.context2d) {
-          const currentAlpha = doc.context2d.globalAlpha;
-          doc.context2d.globalAlpha = 0.2;
-          doc.addImage(watermarkURL, 'JPEG', 60, 120, 80, 80);
-          doc.context2d.globalAlpha = currentAlpha;
-        }
+        await applyShieldWatermark(doc, SHIELD_LOGO_URL);
       } catch (watermarkError) {
         console.error("Error adding watermark to PDF:", watermarkError);
       }
