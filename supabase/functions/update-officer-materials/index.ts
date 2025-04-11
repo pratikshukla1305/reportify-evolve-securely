@@ -63,7 +63,7 @@ serve(async (req) => {
       }
     }
     
-    // Update or insert officer_report_materials view
+    // Call the update_officer_report_materials function created in the SQL migration
     const { data, error } = await supabase.rpc(
       'update_officer_report_materials',
       {

@@ -84,16 +84,22 @@ export const saveReportPdf = async (
     console.log("PDF record stored in database successfully:", pdfData);
     
     try {
-      // Also create or update an entry in the officer_report_materials table
-      // This is a view or aggregation table for officers to see materials
-      await supabase.rpc('update_officer_report_materials', {
-        p_report_id: reportId,
-        p_pdf_id: pdfData.id,
-        p_pdf_name: fileName,
-        p_pdf_url: fileUrl,
-        p_pdf_is_official: isOfficial
+      // Call the edge function instead of direct RPC call
+      const { data, error } = await supabase.functions.invoke('update-officer-materials', {
+        body: {
+          reportId,
+          pdfId: pdfData.id,
+          pdfName: fileName,
+          pdfUrl: fileUrl,
+          pdfIsOfficial: isOfficial
+        }
       });
-      console.log("Updated officer_report_materials successfully");
+      
+      if (error) {
+        console.error("Error calling update-officer-materials function:", error);
+      } else {
+        console.log("Updated officer_report_materials successfully");
+      }
     } catch (materialError) {
       // Don't fail the whole operation if this fails
       console.error("Error updating officer_report_materials:", materialError);

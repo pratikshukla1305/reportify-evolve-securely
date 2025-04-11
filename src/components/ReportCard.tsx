@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { FileText, ShieldCheck, Clock, FileSpreadsheet, FileCode, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -42,7 +41,6 @@ const ReportCard = ({ className, reportId, pdfUrl, onDownload }: ReportCardProps
         // Log download if reportId exists
         if (reportId) {
           try {
-            const user = supabase.auth.getUser();
             // Record the download in the database if possible
             await supabase.from('pdf_downloads').insert({
               report_id: reportId,
