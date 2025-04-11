@@ -37,7 +37,7 @@ export const analyzeVideoEvidence = async (
     }
     
     // Call local FastAPI endpoint
-    const response = await fetch("http://127.0.0.1:8000/predict", {
+    const response = await fetch("http://127.0.0.1:8000/analyze-video", {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -111,24 +111,69 @@ const mockAnalyzeVideo = async (
     });
   }
   
-  // Generate a mock analysis
-  const mockCrimeTypes = ["assault", "theft", "vandalism", "arson", "abuse"];
+  // Generate a mock analysis - USING ONLY THE TRAINED CRIME TYPES
+  const mockCrimeTypes = ["abuse", "assault", "arson", "arrest"];
   const mockCrimeType = mockCrimeTypes[Math.floor(Math.random() * mockCrimeTypes.length)];
   
-  const mockDescriptions = [
-    "The video shows evidence of a crime where a perpetrator approaches the victim in a threatening manner. The incident appears to have occurred in an urban setting.",
-    "Analysis of the video indicates signs of criminal activity taking place on public property. There are multiple individuals involved in the incident.",
-    "The footage reveals a potential crime scene with evidence of property damage. The time stamp suggests this occurred during daylight hours.",
-    "Examination of the video shows suspicious behavior consistent with criminal activity. The location appears to be a commercial establishment."
-  ];
+  const mockDescriptions = {
+    "abuse": 
+      "The detected video may involve abuse-related actions.\n" +
+      "Abuse can be verbal, emotional, or physical.\n" +
+      "It often includes intentional harm inflicted on a victim.\n" +
+      "The victim may display distress or defensive behavior.\n" +
+      "There might be aggressive body language or shouting.\n" +
+      "Such scenes usually lack mutual consent or context of play.\n" +
+      "These actions are violations of basic human rights.\n" +
+      "It is important to report such behavior to authorities.\n" +
+      "Detection helps in early intervention and protection.\n" +
+      "Please verify with human oversight for further action.",
+    
+    "assault": 
+      "Assault involves a physical attack or aggressive encounter.\n" +
+      "This may include punching, kicking, or pushing actions.\n" +
+      "The victim may be seen retreating or being overpowered.\n" +
+      "There is usually a visible conflict or threat present.\n" +
+      "Such behavior is dangerous and potentially life-threatening.\n" +
+      "Immediate attention from security or authorities is critical.\n" +
+      "Assault detection can help prevent further escalation.\n" +
+      "The video may include violent gestures or weapons.\n" +
+      "Please proceed with care while reviewing such footage.\n" +
+      "Confirm with experts before initiating legal steps.",
+    
+    "arson": 
+      "This video likely captures an incident of arson.\n" +
+      "Arson is the criminal act of intentionally setting fire.\n" +
+      "You may see flames, smoke, or ignition devices.\n" +
+      "Often, it targets property like buildings or vehicles.\n" +
+      "Arson can lead to massive destruction and danger to life.\n" +
+      "There might be a rapid spread of fire visible.\n" +
+      "Suspects may appear to flee the scene post-ignition.\n" +
+      "These cases require immediate fire and law response.\n" +
+      "Check for signs of accelerants or premeditated setup.\n" +
+      "This detection must be validated with caution.",
+    
+    "arrest": 
+      "The scene likely depicts a law enforcement arrest.\n" +
+      "An arrest involves restraining a suspect or individual.\n" +
+      "You may see officers using handcuffs or other tools.\n" +
+      "The individual may be cooperating or resisting.\n" +
+      "It could be in public or private settings.\n" +
+      "Often, the suspect is guided or pushed into a vehicle.\n" +
+      "The presence of uniforms or badges may be evident.\n" +
+      "These scenarios may follow legal procedures.\n" +
+      "Misidentification is possible — confirm context.\n" +
+      "Verify with official reports before assuming guilt."
+  };
   
-  const mockDescription = mockDescriptions[Math.floor(Math.random() * mockDescriptions.length)];
+  const description = mockDescriptions[mockCrimeType as keyof typeof mockDescriptions] || 
+    "Analysis of the video indicates signs of potential criminal activity. The incident appears to have occurred in a public setting. Further analysis by law enforcement experts is recommended.";
+  
   const mockConfidence = 0.75 + (Math.random() * 0.2); // 0.75-0.95
   
   const mockAnalysis: VideoAnalysisResult = {
     crimeType: mockCrimeType,
     confidence: mockConfidence,
-    description: mockDescription,
+    description: description,
     analysisTimestamp: new Date().toISOString()
   };
   
@@ -166,7 +211,7 @@ export const getReportAnalysis = async (reportId: string): Promise<VideoAnalysis
       .eq('report_id', reportId)
       .order('created_at', { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle(); // Changed from .single() to .maybeSingle() to prevent errors
     
     if (error) {
       console.error("Error fetching report analysis:", error);

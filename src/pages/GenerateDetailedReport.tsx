@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -9,6 +10,7 @@ import {
   Mail, MapPin, Video
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { v4 as uuidv4 } from 'uuid';
 import { submitReportToOfficer } from '@/services/reportServices';
 import { analyzeVideoEvidence, VideoAnalysisResult, getReportAnalysis } from '@/services/aiAnalysisServices';
 import { Badge } from '@/components/ui/badge';

@@ -32,9 +32,11 @@ export const saveReportPdf = async (
     const fileId = uuidv4();
     const filePath = `report_pdfs/${reportId}/${fileId}-${fileName}`;
     
+    console.log(`Attempting to upload PDF to path: ${filePath}`);
+    
     // Upload PDF to storage
     const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('reports')
+      .from('evidences')  // Using the evidences bucket
       .upload(filePath, pdfBlob, {
         contentType: 'application/pdf',
         cacheControl: '3600'
@@ -42,15 +44,24 @@ export const saveReportPdf = async (
     
     if (uploadError) {
       console.error("Error uploading PDF:", uploadError);
+      toast.error(`PDF upload failed: ${uploadError.message}`);
       throw uploadError;
     }
     
+    console.log("PDF uploaded successfully, getting public URL");
+    
     // Get the URL for the uploaded file
     const { data: urlData } = await supabase.storage
-      .from('reports')
+      .from('evidences')
       .getPublicUrl(filePath);
     
     const fileUrl = urlData?.publicUrl;
+    
+    if (!fileUrl) {
+      throw new Error("Failed to get public URL for PDF");
+    }
+    
+    console.log(`PDF public URL: ${fileUrl}`);
     
     // Store PDF record in database
     const { error: dbError } = await supabase
@@ -68,6 +79,7 @@ export const saveReportPdf = async (
       throw dbError;
     }
     
+    toast.success("PDF saved successfully");
     return fileUrl;
   } catch (error) {
     console.error("Error saving report PDF:", error);
@@ -84,6 +96,7 @@ export const saveReportPdf = async (
  */
 export const getReportPdfs = async (reportId: string): Promise<ReportPdf[]> => {
   try {
+    console.log(`Fetching PDFs for report: ${reportId}`);
     const { data, error } = await supabase
       .from('report_pdfs')
       .select('*')
@@ -95,6 +108,7 @@ export const getReportPdfs = async (reportId: string): Promise<ReportPdf[]> => {
       throw error;
     }
     
+    console.log(`Found ${data?.length || 0} PDFs for the report`);
     return data as ReportPdf[];
   } catch (error) {
     console.error("Error in getReportPdfs:", error);
