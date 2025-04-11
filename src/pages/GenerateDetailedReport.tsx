@@ -26,14 +26,12 @@ import {
   FormMessage 
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { saveReportPdf, shareReportViaEmail, getReportPdfs, applyShieldWatermark } from '@/services/reportPdfService';
+import { saveReportPdf, shareReportViaEmail, getReportPdfs } from '@/services/reportPdfService';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import jsPDF from 'jspdf';
 import { supabase } from '@/integrations/supabase/client';
-
-const SHIELD_LOGO_URL = '/lovable-uploads/594b7790-36fd-4ed7-9eb4-61a6064666af.png';
 
 const locationFormSchema = z.object({
   location: z.string().min(5, {
@@ -188,27 +186,6 @@ const GenerateDetailedReport = () => {
       console.log("Starting PDF generation process...");
       const doc = new jsPDF();
       
-      try {
-        console.log("Attempting to add logo with path:", SHIELD_LOGO_URL);
-        const logoImg = new Image();
-        logoImg.src = SHIELD_LOGO_URL;
-        
-        await new Promise((resolve, reject) => {
-          logoImg.onload = resolve;
-          logoImg.onerror = (err) => {
-            console.error("Error loading logo:", err);
-            reject(err);
-          };
-          if (logoImg.complete) resolve(null);
-        });
-        
-        doc.addImage(logoImg.src, 'PNG', 85, 15, 40, 40);
-        console.log("Shield logo loaded successfully");
-      } catch (logoError) {
-        console.error("Error adding logo to PDF:", logoError);
-        toast.warning("Could not add logo to PDF, continuing with generation");
-      }
-      
       doc.setFontSize(22);
       doc.setTextColor(0, 51, 102);
       doc.text("SHIELD", 105, 20, { align: "center" });
@@ -258,14 +235,6 @@ const GenerateDetailedReport = () => {
         doc.text(`${uploadedImages.length} video/image files`, 20, yPosition + 20);
       } else {
         doc.text("No analysis data available", 20, 105);
-      }
-      
-      try {
-        console.log("Applying Shield watermark with path:", SHIELD_LOGO_URL);
-        await applyShieldWatermark(doc, SHIELD_LOGO_URL);
-      } catch (watermarkError) {
-        console.error("Error adding watermark to PDF:", watermarkError);
-        toast.warning("Could not add watermark to PDF, continuing with generation");
       }
       
       doc.setFontSize(8);

@@ -12,8 +12,6 @@ type ReportCardProps = {
   onDownload?: () => void;
 };
 
-const SHIELD_LOGO_URL = '/lovable-uploads/594b7790-36fd-4ed7-9eb4-61a6064666af.png';
-
 const ReportCard = ({ className, reportId, pdfUrl, onDownload }: ReportCardProps) => {
   const [isDownloading, setIsDownloading] = useState(false);
   

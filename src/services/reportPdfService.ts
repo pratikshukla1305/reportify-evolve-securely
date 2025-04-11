@@ -13,9 +13,6 @@ export interface ReportPdf {
   is_official: boolean;
 }
 
-// Use the correct shield logo path
-const SHIELD_LOGO_URL = '/lovable-uploads/594b7790-36fd-4ed7-9eb4-61a6064666af.png';
-
 /**
  * Save a PDF file to storage and record in database
  * 
@@ -248,74 +245,4 @@ export const getOfficerReportMaterials = async (reportId: string): Promise<any[]
   }
 };
 
-/**
- * Apply Shield watermark to PDF
- * 
- * @param pdf PDF document
- * @param watermarkUrl URL or path to the watermark image
- */
-export const applyShieldWatermark = async (pdf: any, watermarkUrl: string): Promise<void> => {
-  try {
-    console.log("Starting watermark application process with image:", watermarkUrl);
-    // Create a canvas to manipulate the watermark
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    
-    if (!ctx) {
-      console.error("Could not get canvas context for watermark");
-      return;
-    }
-    
-    // Load the watermark image
-    const img = new Image();
-    img.crossOrigin = "Anonymous"; // To handle CORS issues
-    img.src = watermarkUrl;
-    
-    await new Promise((resolve, reject) => {
-      img.onload = resolve;
-      img.onerror = (err) => {
-        console.error("Error loading watermark image:", err);
-        reject(err);
-      };
-      // Handle already loaded images
-      if (img.complete) resolve(null);
-    });
-    
-    console.log("Watermark image loaded successfully");
-    
-    // Set canvas dimensions
-    canvas.width = img.width;
-    canvas.height = img.height;
-    
-    // Draw image and adjust transparency
-    ctx.globalAlpha = 0.2; // Set transparency
-    ctx.drawImage(img, 0, 0);
-    
-    // Convert to data URL
-    const transparentWatermark = canvas.toDataURL('image/png');
-    
-    // Add transparent watermark to center of each page
-    const pageCount = pdf.internal.getNumberOfPages();
-    console.log(`Adding watermark to ${pageCount} pages...`);
-    
-    for (let i = 1; i <= pageCount; i++) {
-      pdf.setPage(i);
-      const pageWidth = pdf.internal.pageSize.width;
-      const pageHeight = pdf.internal.pageSize.height;
-      
-      // Add watermark to center of page
-      pdf.addImage(
-        transparentWatermark,
-        'PNG',
-        pageWidth / 2 - 40,
-        pageHeight / 2 - 40,
-        80,
-        80
-      );
-    }
-    
-    console.log("Watermark applied successfully to all pages");
-  } catch (error) {
-    console.error("Error applying watermark:", error);
-  }
-};
+// Note: We've removed the applyShieldWatermark function since it was causing issues
