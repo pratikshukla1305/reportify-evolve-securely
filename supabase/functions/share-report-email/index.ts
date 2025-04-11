@@ -109,17 +109,20 @@ serve(async (req) => {
       ]
     });
 
-    // Record the email sharing in the database
-    await supabase
+    // Record the email sharing directly in the database using SQL
+    // This edge function has admin privileges
+    const { error: insertError } = await supabase
       .from("report_shares")
-      .insert([
-        {
-          report_id: reportId,
-          shared_to: recipientEmail,
-          share_type: "email",
-          shared_at: new Date().toISOString()
-        }
-      ]);
+      .insert({
+        report_id: reportId,
+        shared_to: recipientEmail,
+        share_type: "email",
+        shared_at: new Date().toISOString()
+      });
+      
+    if (insertError) {
+      console.error("Error recording share from edge function:", insertError);
+    }
 
     return new Response(
       JSON.stringify({ 

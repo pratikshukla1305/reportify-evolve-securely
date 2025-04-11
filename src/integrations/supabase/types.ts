@@ -634,6 +634,30 @@ export type Database = {
           },
         ]
       }
+      report_shares: {
+        Row: {
+          id: string
+          report_id: string
+          share_type: string
+          shared_at: string
+          shared_to: string
+        }
+        Insert: {
+          id?: string
+          report_id: string
+          share_type: string
+          shared_at?: string
+          shared_to: string
+        }
+        Update: {
+          id?: string
+          report_id?: string
+          share_type?: string
+          shared_at?: string
+          shared_to?: string
+        }
+        Relationships: []
+      }
       sos_alerts: {
         Row: {
           alert_id: string
