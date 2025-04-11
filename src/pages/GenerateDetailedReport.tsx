@@ -6,11 +6,11 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { 
   FileText, Check, RotateCcw, Download, Share2, 
   ArrowLeft, Send, ShieldAlert, MessageCircle, Phone,
-  Mail, MapPin
+  Mail, MapPin, Video
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { submitReportToOfficer } from '@/services/reportServices';
-import { analyzeVideoEvidence, VideoAnalysisResult } from '@/services/aiAnalysisServices';
+import { analyzeVideoEvidence, VideoAnalysisResult, getReportAnalysis } from '@/services/aiAnalysisServices';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -25,12 +25,12 @@ import {
   FormMessage 
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { saveReportPdf, shareReportViaEmail } from '@/services/reportPdfService';
+import { saveReportPdf, shareReportViaEmail, getReportPdfs } from '@/services/reportPdfService';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import jsPDF from 'jspdf';
-import { supabase } from '@/services/supabase';
+import { supabase } from '@/integrations/supabase/client';
 
 const SHIELD_LOGO_URL = '/logo.jpg';
 

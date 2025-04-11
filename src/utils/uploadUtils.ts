@@ -46,6 +46,87 @@ export const uploadFilesToSupabase = async (
   return uploadedUrls;
 };
 
+// Upload criminal photo to Supabase storage
+export const uploadCriminalPhoto = async (
+  file: File,
+  officerId: string
+): Promise<string | null> => {
+  try {
+    // Create a unique file path
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${uuidv4()}.${fileExt}`;
+    const filePath = `criminals/${officerId}/${fileName}`;
+    
+    // Upload file to Supabase storage
+    const { error } = await supabase.storage
+      .from('evidences')
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: false,
+        contentType: file.type
+      });
+    
+    if (error) {
+      console.error('Error uploading criminal photo:', error);
+      return null;
+    }
+    
+    // Get public URL for the uploaded file
+    const { data: urlData } = supabase.storage
+      .from('evidences')
+      .getPublicUrl(filePath);
+    
+    return urlData?.publicUrl || null;
+  } catch (error) {
+    console.error('Error in uploadCriminalPhoto:', error);
+    return null;
+  }
+};
+
+// Upload voice message to Supabase storage
+export const uploadVoiceMessage = async (
+  audioBlob: Blob,
+  userId: string,
+  alertId: string
+): Promise<string | null> => {
+  try {
+    const fileName = `${alertId}.mp3`;
+    const filePath = `voice-messages/${userId}/${fileName}`;
+    
+    // Upload file to Supabase storage
+    const { error } = await supabase.storage
+      .from('evidences')
+      .upload(filePath, audioBlob, {
+        cacheControl: '3600',
+        upsert: false,
+        contentType: 'audio/mp3'
+      });
+    
+    if (error) {
+      console.error('Error uploading voice message:', error);
+      return null;
+    }
+    
+    // Get public URL for the uploaded file
+    const { data: urlData } = supabase.storage
+      .from('evidences')
+      .getPublicUrl(filePath);
+    
+    // Also store the recording reference in the database
+    if (urlData?.publicUrl) {
+      await supabase.from('voice_recordings').insert({
+        alert_id: alertId,
+        recording_url: urlData.publicUrl
+      });
+    }
+    
+    return urlData?.publicUrl || null;
+  } catch (error) {
+    console.error('Error in uploadVoiceMessage:', error);
+    return null;
+  }
+};
+
 // Create a draft report
 export const createDraftReport = async (
   userId: string,
