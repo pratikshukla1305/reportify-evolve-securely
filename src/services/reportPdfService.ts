@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { v4 as uuidv4 } from 'uuid';
@@ -81,21 +80,7 @@ export const saveReportPdf = async (
       throw dbError;
     }
     
-    // Record will be available in officer_report_materials view automatically
-    try {
-      const { data: reportData } = await supabase
-        .from('crime_reports')
-        .select('user_id, title, status')
-        .eq('id', reportId)
-        .single();
-        
-      if (reportData && pdfData) {
-        // The record will be automatically available in the officer_report_materials view
-        console.log("PDF record will be available in officer_report_materials view");
-      }
-    } catch (err) {
-      console.error("Error getting report data:", err);
-    }
+    console.log("PDF record stored in database successfully:", pdfData);
     
     toast.success("PDF saved successfully");
     return fileUrl;
@@ -246,6 +231,7 @@ export const getOfficerReportMaterials = async (reportId: string): Promise<any[]
  */
 export const applyShieldWatermark = async (pdf: any, watermarkUrl: string): Promise<void> => {
   try {
+    console.log("Starting watermark application process...");
     // Create a canvas to manipulate the watermark
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
@@ -264,6 +250,8 @@ export const applyShieldWatermark = async (pdf: any, watermarkUrl: string): Prom
       if (img.complete) resolve(null);
     });
     
+    console.log("Watermark image loaded successfully");
+    
     // Set canvas dimensions
     canvas.width = img.width;
     canvas.height = img.height;
@@ -277,6 +265,7 @@ export const applyShieldWatermark = async (pdf: any, watermarkUrl: string): Prom
     
     // Add transparent watermark to center of each page
     const pageCount = pdf.internal.getNumberOfPages();
+    console.log(`Adding watermark to ${pageCount} pages...`);
     
     for (let i = 1; i <= pageCount; i++) {
       pdf.setPage(i);
@@ -293,7 +282,10 @@ export const applyShieldWatermark = async (pdf: any, watermarkUrl: string): Prom
         80
       );
     }
+    
+    console.log("Watermark applied successfully to all pages");
   } catch (error) {
     console.error("Error applying watermark:", error);
+    throw error;
   }
 };

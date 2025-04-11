@@ -185,9 +185,11 @@ const GenerateDetailedReport = () => {
   
   const generatePDF = async () => {
     try {
+      console.log("Starting PDF generation...");
       const doc = new jsPDF();
       
       try {
+        console.log("Attempting to add logo...");
         const logoImg = new Image();
         logoImg.src = SHIELD_LOGO_URL;
         
@@ -255,6 +257,7 @@ const GenerateDetailedReport = () => {
       }
       
       try {
+        console.log("Applying Shield watermark...");
         await applyShieldWatermark(doc, SHIELD_LOGO_URL);
       } catch (watermarkError) {
         console.error("Error adding watermark to PDF:", watermarkError);
@@ -273,31 +276,54 @@ const GenerateDetailedReport = () => {
         const fileUrl = await saveReportPdf(reportId, pdfBlob, fileName, false);
         
         if (fileUrl) {
-          setPdfUrl(fileUrl);
           console.log("PDF saved with URL:", fileUrl);
+          setPdfUrl(fileUrl);
           
           const objectUrl = URL.createObjectURL(pdfBlob);
           
           const link = document.createElement('a');
           link.href = objectUrl;
           link.download = fileName;
+          link.target = '_blank';
           document.body.appendChild(link);
           link.click();
-          document.body.removeChild(link);
+          
+          setTimeout(() => {
+            URL.revokeObjectURL(objectUrl);
+            document.body.removeChild(link);
+          }, 100);
+          
+          toast.success("PDF downloaded successfully");
+          return fileUrl;
+        } else {
+          throw new Error("Failed to save PDF to server");
         }
       } else {
         console.error("Cannot save PDF: No report ID available");
+        throw new Error("No report ID available");
       }
-      
-      toast.success("PDF downloaded successfully");
     } catch (error: any) {
       console.error("Error generating PDF:", error);
       toast.error("Failed to generate PDF: " + (error.message || "Unknown error"));
+      return null;
     }
   };
   
-  const handleDownload = () => {
-    generatePDF();
+  const handleDownload = async () => {
+    if (pdfUrl) {
+      console.log("Using existing PDF URL for download:", pdfUrl);
+      const link = document.createElement('a');
+      link.href = pdfUrl;
+      link.download = `Shield-Crime-Report-${reportId}.pdf`;
+      link.target = '_blank';
+      document.body.appendChild(link);
+      link.click();
+      setTimeout(() => document.body.removeChild(link), 100);
+      toast.success("PDF download started");
+    } else {
+      console.log("No PDF URL available, generating new PDF...");
+      await generatePDF();
+    }
   };
   
   const handleShare = (platform: string) => {

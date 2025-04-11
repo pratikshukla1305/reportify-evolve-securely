@@ -16,17 +16,30 @@ const ReportCard = ({ className, reportId, pdfUrl, onDownload }: ReportCardProps
   const handleDownloadClick = () => {
     if (onDownload) {
       onDownload();
-    } else if (pdfUrl) {
-      // If we have a URL but no custom download handler
+      return;
+    } 
+    
+    if (pdfUrl) {
+      console.log("Downloading PDF from URL:", pdfUrl);
+      // Create an invisible anchor element for the download
       const link = document.createElement('a');
       link.href = pdfUrl;
       link.download = `Shield-Report-${reportId || 'download'}.pdf`;
+      // This is important to make it work on all browsers
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
+      
+      // Remove the link from the document
+      setTimeout(() => {
+        document.body.removeChild(link);
+      }, 100);
+      
       toast.success("PDF download started");
     } else {
       toast.error("No PDF available to download");
+      console.error("No PDF URL available for download");
     }
   };
   
