@@ -1,4 +1,3 @@
-
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -30,6 +29,7 @@ app.add_middleware(
 # Define request and response models
 class VideoRequest(BaseModel):
     video_url: str
+    location: Optional[str] = None
 
 class AnalysisResponse(BaseModel):
     crime_type: str
@@ -238,6 +238,7 @@ async def analyze_video(request: VideoRequest):
         video_path = f"temp/video_{timestamp}.mp4"
         
         print(f"Starting analysis of video: {video_url}")
+        print(f"Location context: {request.location}")
         
         # Download the video
         downloaded_path = download_video(video_url, video_path)
@@ -270,6 +271,11 @@ async def analyze_video(request: VideoRequest):
 async def health_check():
     """Health check endpoint."""
     return {"status": "healthy", "model_loaded": model is not None and model != "model_placeholder"}
+
+# Explicitly handle OPTIONS requests for CORS preflight
+@app.options("/analyze-video")
+async def options_analyze_video():
+    return {}
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

@@ -1,5 +1,6 @@
-import React from 'react';
-import { FileText, ShieldCheck, Clock, FileSpreadsheet, FileCode, Download } from 'lucide-react';
+
+import React, { useState } from 'react';
+import { FileText, ShieldCheck, Clock, FileSpreadsheet, FileCode, Download, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -13,6 +14,8 @@ type ReportCardProps = {
 };
 
 const ReportCard = ({ className, reportId, pdfUrl, onDownload }: ReportCardProps) => {
+  const [isDownloading, setIsDownloading] = useState(false);
+  
   const handleDownloadClick = async () => {
     if (onDownload) {
       onDownload();
@@ -20,6 +23,8 @@ const ReportCard = ({ className, reportId, pdfUrl, onDownload }: ReportCardProps
     }
     
     try {
+      setIsDownloading(true);
+      
       if (pdfUrl) {
         console.log("Downloading PDF from URL:", pdfUrl);
         
@@ -74,6 +79,10 @@ const ReportCard = ({ className, reportId, pdfUrl, onDownload }: ReportCardProps
             const latestPdf = pdfs[0];
             console.log("Found PDF:", latestPdf);
             
+            if (!latestPdf.file_url) {
+              throw new Error("PDF file URL is missing");
+            }
+            
             // Create and click download link
             const link = document.createElement('a');
             link.href = latestPdf.file_url;
@@ -87,6 +96,22 @@ const ReportCard = ({ className, reportId, pdfUrl, onDownload }: ReportCardProps
             setTimeout(() => {
               document.body.removeChild(link);
             }, 100);
+            
+            // Try to call our edge function to update officer materials
+            try {
+              await supabase.functions.invoke('update-officer-materials', {
+                body: {
+                  reportId,
+                  pdfId: latestPdf.id,
+                  pdfName: latestPdf.file_name,
+                  pdfUrl: latestPdf.file_url,
+                  pdfIsOfficial: latestPdf.is_official || false
+                }
+              });
+            } catch (edgeError) {
+              console.error("Failed to update officer materials:", edgeError);
+              // Continue, as this is not critical for the download
+            }
             
             toast.success("PDF download started");
             return;
@@ -102,6 +127,8 @@ const ReportCard = ({ className, reportId, pdfUrl, onDownload }: ReportCardProps
     } catch (error: any) {
       toast.error(`Download failed: ${error.message || "Unknown error"}`);
       console.error("PDF download error:", error);
+    } finally {
+      setIsDownloading(false);
     }
   };
   
@@ -167,10 +194,20 @@ const ReportCard = ({ className, reportId, pdfUrl, onDownload }: ReportCardProps
         {pdfUrl ? (
           <Button 
             onClick={handleDownloadClick}
+            disabled={isDownloading}
             className="bg-shield-blue text-white hover:bg-blue-600 transition-all"
           >
-            <Download className="mr-2 h-4 w-4" />
-            Download Report
+            {isDownloading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Downloading...
+              </>
+            ) : (
+              <>
+                <Download className="mr-2 h-4 w-4" />
+                Download Report
+              </>
+            )}
           </Button>
         ) : (
           <Button 

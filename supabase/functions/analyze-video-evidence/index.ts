@@ -70,7 +70,10 @@ async function tryLocalModel(videoUrl: string): Promise<any | null> {
     
     const response = await fetch(localModelUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+      },
       body: JSON.stringify({ video_url: videoUrl }),
       // Longer timeout to allow download and processing
       signal: AbortSignal.timeout(30000)

@@ -9,7 +9,7 @@ export interface VideoAnalysisResult {
   analysisTimestamp: string;
 }
 
-// Function to analyze video evidence using FastAPI
+// Function to analyze video evidence using Edge Function instead of direct FastAPI call
 export const analyzeVideoEvidence = async (
   videoUrl: string, 
   reportId: string,
@@ -18,7 +18,7 @@ export const analyzeVideoEvidence = async (
   try {
     console.log("Analyzing video evidence:", videoUrl);
     
-    // Record the video in our new analysis_videos table
+    // Record the video in our analysis_videos table
     const { data: videoData, error: videoError } = await supabase
       .from('analysis_videos')
       .insert({
@@ -35,59 +35,61 @@ export const analyzeVideoEvidence = async (
       console.error("Error recording video for analysis:", videoError);
       throw new Error(videoError.message);
     }
-    
-    // Call local FastAPI endpoint
-    const response = await fetch("http://127.0.0.1:8000/analyze-video", {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        video_url: videoUrl,
+
+    // Call our edge function instead of trying to access FastAPI directly
+    const { data, error } = await supabase.functions.invoke('analyze-video-evidence', {
+      body: { 
+        videoUrl, 
+        reportId,
         location: location || 'Unknown location'
-      }),
+      }
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      // Fallback to mock analysis if local API is not available
-      console.warn(`FastAPI not available (${response.status}): ${errorText}`);
-      toast.warning("Local API not available. Using fallback analysis.");
+    if (error) {
+      console.error("Error calling analyze-video-evidence:", error);
       return await mockAnalyzeVideo(videoUrl, reportId, videoData?.id);
     }
 
-    const result = await response.json();
-    console.log("FastAPI analysis result:", result);
-    
+    if (!data.success) {
+      console.error("Analysis failed:", data.error);
+      return await mockAnalyzeVideo(videoUrl, reportId, videoData?.id);
+    }
+
+    console.log("Edge function analysis result:", data);
+
     // Update the analysis video status
-    await supabase.rpc('update_analysis_video_status', {
-      p_video_id: videoData.id,
-      p_status: 'analyzed'
-    });
-    
-    // Store the analysis result in the database
-    const { error: analysisError } = await supabase
-      .from('crime_report_analysis')
-      .insert({
-        report_id: reportId,
-        crime_type: result.crime_type || "Unknown",
-        confidence: result.confidence || 0.75,
-        description: result.description || "No description available",
-        model_version: "FastAPI-Custom-v1"
+    if (videoData?.id) {
+      await supabase.rpc('update_analysis_video_status', {
+        p_video_id: videoData.id,
+        p_status: 'analyzed'
       });
+    }
     
-    if (analysisError) {
-      console.error("Error saving analysis result:", analysisError);
+    // Store the analysis result in the database if not already stored by the edge function
+    // This is a safeguard in case the edge function didn't store it
+    if (data.analysis && reportId) {
+      try {
+        const { error: analysisError } = await supabase
+          .from('crime_report_analysis')
+          .insert({
+            report_id: reportId,
+            crime_type: data.analysis.crimeType,
+            confidence: data.analysis.confidence,
+            description: data.analysis.description,
+            model_version: "EdgeFunction-v1"
+          });
+        
+        if (analysisError) {
+          console.error("Error saving analysis result:", analysisError);
+        }
+      } catch (storeError) {
+        console.error("Failed to store analysis:", storeError);
+      }
     }
     
     return {
       success: true,
-      analysis: {
-        crimeType: result.crime_type || "Unknown",
-        confidence: result.confidence || 0.75,
-        description: result.description || "No description available",
-        analysisTimestamp: new Date().toISOString()
-      }
+      analysis: data.analysis
     };
   } catch (error: any) {
     console.error("Error with video analysis:", error);
