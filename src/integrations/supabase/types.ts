@@ -966,6 +966,24 @@ export type Database = {
         Args: { p_video_id: string; p_status: string }
         Returns: undefined
       }
+      update_officer_report_materials: {
+        Args: {
+          p_report_id: string
+          p_pdf_id?: string
+          p_pdf_name?: string
+          p_pdf_url?: string
+          p_pdf_is_official?: boolean
+          p_video_id?: string
+          p_video_name?: string
+          p_video_url?: string
+          p_video_status?: string
+          p_video_size?: number
+          p_report_title?: string
+          p_report_status?: string
+          p_user_id?: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
