@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -5,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { 
   FileText, Check, RotateCcw, Download, Share2, 
-  ArrowLeft, Send, ShieldAlert, MessageCircle, Phone 
+  ArrowLeft, Send, ShieldAlert, MessageCircle, Phone,
+  Mail, MapPin
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { submitReportToOfficer } from '@/services/reportServices';
@@ -14,7 +16,42 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { 
+  Form, 
+  FormControl, 
+  FormDescription, 
+  FormField, 
+  FormItem, 
+  FormLabel, 
+  FormMessage 
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { saveReportPdf, shareReportViaEmail } from '@/services/reportPdfService';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
 import jsPDF from 'jspdf';
+
+// Shield logo for PDF stamping
+const SHIELD_LOGO_URL = '/logo.jpg';
+
+const locationFormSchema = z.object({
+  location: z.string().min(5, {
+    message: "Location must be at least 5 characters",
+  }),
+});
+
+const emailFormSchema = z.object({
+  email: z.string().email({
+    message: "Please enter a valid email address",
+  }),
+  subject: z.string().min(5, {
+    message: "Subject must be at least 5 characters",
+  }),
+  message: z.string().min(10, {
+    message: "Message must be at least 10 characters",
+  }),
+});
 
 const GenerateDetailedReport = () => {
   const navigate = useNavigate();
@@ -27,6 +64,26 @@ const GenerateDetailedReport = () => {
   const [analysisResult, setAnalysisResult] = useState<VideoAnalysisResult | null>(null);
   const [analysisProgress, setAnalysisProgress] = useState(0);
   const [analysisStep, setAnalysisStep] = useState<string>('preparing');
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [isSharingEmail, setIsSharingEmail] = useState(false);
+  
+  // Form for location input
+  const locationForm = useForm<z.infer<typeof locationFormSchema>>({
+    resolver: zodResolver(locationFormSchema),
+    defaultValues: {
+      location: '',
+    },
+  });
+
+  // Form for email sharing
+  const emailForm = useForm<z.infer<typeof emailFormSchema>>({
+    resolver: zodResolver(emailFormSchema),
+    defaultValues: {
+      email: '',
+      subject: 'Crime Incident Report',
+      message: 'Please find attached the crime incident report for your review.',
+    },
+  });
   
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
@@ -65,7 +122,7 @@ const GenerateDetailedReport = () => {
     return () => clearInterval(interval);
   };
   
-  const handleGenerate = async () => {
+  const handleGenerate = async (formData: z.infer<typeof locationFormSchema>) => {
     setIsGenerating(true);
     simulateProgress();
     
@@ -74,7 +131,7 @@ const GenerateDetailedReport = () => {
         console.log("Analyzing video evidence:", uploadedImages[0]);
         const videoUrl = uploadedImages[0];
         
-        const result = await analyzeVideoEvidence(videoUrl, reportId);
+        const result = await analyzeVideoEvidence(videoUrl, reportId, formData.location);
         
         if (result.success && result.analysis) {
           setAnalysisResult(result.analysis);
@@ -102,45 +159,59 @@ const GenerateDetailedReport = () => {
     }
   };
   
-  const generatePDF = () => {
+  const generatePDF = async () => {
     try {
       const doc = new jsPDF();
       
+      // Load Shield logo for stamping
+      const img = new Image();
+      img.src = SHIELD_LOGO_URL;
+      
+      await new Promise((resolve) => {
+        img.onload = resolve;
+      });
+      
+      // Create PDF content
       doc.setFontSize(22);
       doc.setTextColor(0, 51, 102);
       doc.text("SHIELD", 105, 20, { align: "center" });
       
-      doc.setFillColor(0, 51, 102);
-      doc.circle(105, 30, 8, 'F');
-      doc.setFillColor(255, 255, 255);
-      doc.rect(103, 26, 4, 8, 'F');
+      // Add Shield logo
+      try {
+        doc.addImage(img, 'PNG', 95, 25, 20, 20);
+      } catch (logoError) {
+        console.error("Error adding logo to PDF:", logoError);
+      }
       
       doc.setFontSize(18);
       doc.setTextColor(0, 0, 0);
-      doc.text("Crime Incident Report", 105, 45, { align: "center" });
+      doc.text("Crime Incident Report", 105, 55, { align: "center" });
       
       doc.setFontSize(11);
-      doc.text(`Report ID: ${reportId || "Unknown"}`, 20, 55);
-      doc.text(`Date: ${new Date().toLocaleDateString()}`, 20, 62);
-      doc.text(`Time: ${new Date().toLocaleTimeString()}`, 20, 69);
-      doc.text(`Location: ${location || 'Not specified'}`, 20, 76);
+      doc.text(`Report ID: ${reportId || "Unknown"}`, 20, 65);
+      doc.text(`Date: ${new Date().toLocaleDateString()}`, 20, 72);
+      doc.text(`Time: ${new Date().toLocaleTimeString()}`, 20, 79);
+      
+      // Get location from form
+      const userLocation = locationForm.getValues().location;
+      doc.text(`Location: ${userLocation || 'Not specified'}`, 20, 86);
       
       doc.setFontSize(14);
       doc.setTextColor(0, 51, 102);
-      doc.text("AI Analysis Results", 20, 95);
+      doc.text("AI Analysis Results", 20, 100);
       
       if (analysisResult) {
         doc.setFontSize(11);
         doc.setTextColor(0, 0, 0);
-        doc.text(`Incident Type: ${analysisResult.crimeType}`, 20, 105);
-        doc.text(`Detection Confidence: ${Math.round(analysisResult.confidence * 100)}%`, 20, 112);
+        doc.text(`Incident Type: ${analysisResult.crimeType}`, 20, 110);
+        doc.text(`Detection Confidence: ${Math.round(analysisResult.confidence * 100)}%`, 20, 117);
         
         doc.setFontSize(12);
         doc.setTextColor(0, 51, 102);
-        doc.text("Incident Description:", 20, 125);
+        doc.text("Incident Description:", 20, 130);
         
         const descriptionLines = analysisResult.description.split('\n');
-        let yPosition = 135;
+        let yPosition = 140;
         
         doc.setFontSize(10);
         doc.setTextColor(0, 0, 0);
@@ -160,11 +231,33 @@ const GenerateDetailedReport = () => {
         doc.text("No analysis data available", 20, 105);
       }
       
+      // Add watermark/stamp with transparency
+      doc.setGState(new doc.GState({ opacity: 0.2 }));
+      try {
+        doc.addImage(img, 'PNG', 60, 120, 80, 80);
+      } catch (watermarkError) {
+        console.error("Error adding watermark to PDF:", watermarkError);
+      }
+      doc.setGState(new doc.GState({ opacity: 1.0 }));
+      
       doc.setFontSize(8);
       doc.setTextColor(128, 128, 128);
       doc.text("This report was generated by Shield - Securely report incidents with confidence", 105, 280, { align: "center" });
       
-      doc.save(`Shield-Crime-Report-${reportId}.pdf`);
+      // Generate PDF blob
+      const pdfBlob = doc.output('blob');
+      
+      // Save PDF to database and storage
+      const fileName = `Shield-Crime-Report-${reportId}.pdf`;
+      if (reportId) {
+        const fileUrl = await saveReportPdf(reportId, pdfBlob, fileName, false);
+        if (fileUrl) {
+          setPdfUrl(fileUrl);
+        }
+      }
+      
+      // Download the PDF file
+      doc.save(fileName);
       toast.success("PDF downloaded successfully");
     } catch (error: any) {
       console.error("Error generating PDF:", error);
@@ -187,12 +280,48 @@ const GenerateDetailedReport = () => {
       case 'telegram':
         shareUrl = `https://t.me/share/url?url=${encodeURIComponent(reportUrl)}&text=Check%20out%20this%20incident%20report`;
         break;
+      case 'email':
+        setIsSharingEmail(true);
+        return;
       default:
         shareUrl = reportUrl;
     }
     
     window.open(shareUrl, '_blank');
     toast.success(`Report shared via ${platform}`);
+  };
+  
+  const handleEmailShare = async (formData: z.infer<typeof emailFormSchema>) => {
+    if (!pdfUrl) {
+      toast.error("Please generate a PDF report first");
+      return;
+    }
+    
+    if (!reportId) {
+      toast.error("Report ID not found");
+      return;
+    }
+    
+    setIsSharingEmail(true);
+    
+    try {
+      const success = await shareReportViaEmail(
+        reportId,
+        pdfUrl,
+        formData.email,
+        formData.subject,
+        formData.message
+      );
+      
+      if (success) {
+        toast.success("Report shared via email successfully");
+        setIsSharingEmail(false);
+      }
+    } catch (error) {
+      console.error("Error sharing via email:", error);
+      toast.error("Failed to send email. Please try again.");
+      setIsSharingEmail(false);
+    }
   };
   
   const handleSendToOfficer = async () => {
@@ -326,6 +455,74 @@ const GenerateDetailedReport = () => {
     );
   };
   
+  const renderEmailShareForm = () => {
+    return (
+      <div className="p-4">
+        <h4 className="font-medium mb-3">Share via Email</h4>
+        <Form {...emailForm}>
+          <form onSubmit={emailForm.handleSubmit(handleEmailShare)} className="space-y-3">
+            <FormField
+              control={emailForm.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Recipient Email</FormLabel>
+                  <FormControl>
+                    <Input placeholder="recipient@example.com" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={emailForm.control}
+              name="subject"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Subject</FormLabel>
+                  <FormControl>
+                    <Input {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={emailForm.control}
+              name="message"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Message</FormLabel>
+                  <FormControl>
+                    <Input {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="flex justify-end">
+              <Button 
+                type="submit" 
+                disabled={isSharingEmail || !pdfUrl}
+                className="bg-shield-blue text-white hover:bg-blue-600"
+              >
+                {isSharingEmail ? (
+                  <>
+                    <RotateCcw className="mr-2 h-4 w-4 animate-spin" /> Sending...
+                  </>
+                ) : (
+                  <>
+                    <Send className="mr-2 h-4 w-4" /> Send Email
+                  </>
+                )}
+              </Button>
+            </div>
+          </form>
+        </Form>
+      </div>
+    );
+  };
+  
   return (
     <div className="min-h-screen bg-white">
       <Navbar />
@@ -405,25 +602,58 @@ const GenerateDetailedReport = () => {
             {isComplete && analysisResult && renderAnalysisResult()}
             
             {!isComplete ? (
-              <div className="text-center">
-                <Button 
-                  size="lg"
-                  className="bg-shield-blue text-white hover:bg-blue-600 transition-all"
-                  onClick={handleGenerate}
-                  disabled={isGenerating}
-                >
-                  {isGenerating ? (
-                    <>
-                      <RotateCcw className="mr-2 h-4 w-4 animate-spin" />
-                      Analyzing & Generating...
-                    </>
-                  ) : (
-                    <>
-                      <FileText className="mr-2 h-4 w-4" />
-                      Generate Report with AI Analysis
-                    </>
-                  )}
-                </Button>
+              <div className="bg-white rounded-lg border border-gray-200 p-6 mb-8">
+                <h3 className="text-lg font-medium mb-4">
+                  <div className="flex items-center">
+                    <MapPin className="mr-2 h-5 w-5 text-shield-blue" />
+                    Specify Incident Location
+                  </div>
+                </h3>
+                
+                <Form {...locationForm}>
+                  <form onSubmit={locationForm.handleSubmit(handleGenerate)} className="space-y-4">
+                    <FormField
+                      control={locationForm.control}
+                      name="location"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Location Details</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="Enter detailed location (e.g., 123 Main St, Boston, MA 02108)" 
+                              {...field} 
+                              className="w-full"
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            Please provide the most detailed location information possible
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <div className="text-center pt-4">
+                      <Button 
+                        type="submit"
+                        className="bg-shield-blue text-white hover:bg-blue-600 transition-all"
+                        disabled={isGenerating}
+                      >
+                        {isGenerating ? (
+                          <>
+                            <RotateCcw className="mr-2 h-4 w-4 animate-spin" />
+                            Analyzing & Generating...
+                          </>
+                        ) : (
+                          <>
+                            <FileText className="mr-2 h-4 w-4" />
+                            Generate Report with AI Analysis
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </form>
+                </Form>
               </div>
             ) : (
               <div className="text-center">
@@ -473,10 +703,26 @@ const GenerateDetailedReport = () => {
                           </div>
                           Telegram
                         </Button>
+                        <Button 
+                          variant="ghost"
+                          className="justify-start rounded-none"
+                          onClick={() => handleShare('email')}
+                        >
+                          <div className="bg-gray-500 rounded-full p-1 mr-2">
+                            <Mail size={14} color="white" />
+                          </div>
+                          Email
+                        </Button>
                       </div>
                     </PopoverContent>
                   </Popover>
                 </div>
+                
+                {isSharingEmail && (
+                  <div className="bg-gray-50 rounded-lg border border-gray-200 p-4 mb-6">
+                    {renderEmailShareForm()}
+                  </div>
+                )}
                 
                 <div className="mt-8 pt-8 border-t border-gray-200">
                   <p className="text-gray-700 mb-4">Send this report to an officer for further processing</p>

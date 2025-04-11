@@ -20,11 +20,16 @@ export type AnalysisResponse = {
  * Analyze video evidence using AI
  * @param videoUrl URL of the video to analyze
  * @param reportId Optional report ID to associate the analysis with
+ * @param location Optional location information for the analysis
  * @returns Analysis result
  */
-export const analyzeVideoEvidence = async (videoUrl: string, reportId?: string): Promise<AnalysisResponse> => {
+export const analyzeVideoEvidence = async (
+  videoUrl: string, 
+  reportId?: string,
+  location?: string
+): Promise<AnalysisResponse> => {
   try {
-    console.log(`Starting analysis for video: ${videoUrl}, reportId: ${reportId}`);
+    console.log(`Starting analysis for video: ${videoUrl}, reportId: ${reportId}, location: ${location}`);
     
     // First, check if this video has already been analyzed
     if (reportId) {
@@ -61,7 +66,7 @@ export const analyzeVideoEvidence = async (videoUrl: string, reportId?: string):
       const response = await fetch('http://localhost:8000/analyze-video', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ video_url: videoUrl }),
+        body: JSON.stringify({ video_url: videoUrl, location }),
         signal: AbortSignal.timeout(15000) // 15 second timeout for local model
       });
       
@@ -78,7 +83,7 @@ export const analyzeVideoEvidence = async (videoUrl: string, reportId?: string):
         
         // Store the analysis result if we have a report ID
         if (reportId) {
-          await storeAnalysisResult(reportId, analysis);
+          await storeAnalysisResult(reportId, analysis, location);
         }
         
         return { success: true, analysis };
@@ -91,7 +96,7 @@ export const analyzeVideoEvidence = async (videoUrl: string, reportId?: string):
     
     // Fallback to edge function if local model fails
     const { data, error } = await supabase.functions.invoke('analyze-video-evidence', {
-      body: { videoUrl, reportId }
+      body: { videoUrl, reportId, location }
     });
     
     if (error) {
@@ -110,7 +115,7 @@ export const analyzeVideoEvidence = async (videoUrl: string, reportId?: string):
     
     // If we have a report ID, store the analysis result in the database
     if (reportId && data.analysis) {
-      await storeAnalysisResult(reportId, data.analysis);
+      await storeAnalysisResult(reportId, data.analysis, location);
     }
     
     return data;
@@ -125,8 +130,9 @@ export const analyzeVideoEvidence = async (videoUrl: string, reportId?: string):
  * Store analysis result in the database
  * @param reportId Report ID
  * @param analysis Analysis result
+ * @param location Optional location information
  */
-async function storeAnalysisResult(reportId: string, analysis: VideoAnalysisResult) {
+async function storeAnalysisResult(reportId: string, analysis: VideoAnalysisResult, location?: string) {
   try {
     await supabase
       .from('crime_report_analysis' as any)
@@ -137,6 +143,16 @@ async function storeAnalysisResult(reportId: string, analysis: VideoAnalysisResu
         description: analysis.description,
         model_version: 'v1.0'
       });
+      
+    // Also update the report with location information if provided
+    if (location) {
+      await supabase
+        .from('crime_reports')
+        .update({
+          detailed_location: location
+        })
+        .eq('id', reportId);
+    }
       
     console.log("Analysis stored in database");
   } catch (upsertError: any) {

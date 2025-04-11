@@ -187,6 +187,7 @@ export type Database = {
       crime_reports: {
         Row: {
           description: string | null
+          detailed_location: string | null
           id: string
           incident_date: string | null
           is_anonymous: boolean
@@ -200,6 +201,7 @@ export type Database = {
         }
         Insert: {
           description?: string | null
+          detailed_location?: string | null
           id?: string
           incident_date?: string | null
           is_anonymous?: boolean
@@ -213,6 +215,7 @@ export type Database = {
         }
         Update: {
           description?: string | null
+          detailed_location?: string | null
           id?: string
           incident_date?: string | null
           is_anonymous?: boolean
@@ -593,6 +596,44 @@ export type Database = {
         }
         Relationships: []
       }
+      report_pdfs: {
+        Row: {
+          created_at: string
+          file_name: string
+          file_size: number | null
+          file_url: string
+          id: string
+          is_official: boolean | null
+          report_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          file_size?: number | null
+          file_url: string
+          id?: string
+          is_official?: boolean | null
+          report_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          file_size?: number | null
+          file_url?: string
+          id?: string
+          is_official?: boolean | null
+          report_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_pdfs_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "crime_reports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sos_alerts: {
         Row: {
           alert_id: string
@@ -646,6 +687,44 @@ export type Database = {
           voice_recording?: string | null
         }
         Relationships: []
+      }
+      user_notifications: {
+        Row: {
+          created_at: string
+          id: string
+          is_read: boolean | null
+          message: string
+          notification_type: string
+          report_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_read?: boolean | null
+          message: string
+          notification_type: string
+          report_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_read?: boolean | null
+          message?: string
+          notification_type?: string
+          report_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_notifications_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "crime_reports"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       video_analysis_queue: {
         Row: {
