@@ -194,28 +194,36 @@ const mockAnalyzeVideo = async (
     }
     
     // Also store in officer_report_materials if there's a video
-    if (videoUrl) {
-      const { data: reportData } = await supabase
-        .from('crime_reports')
-        .select('user_id, title, status')
-        .eq('id', reportId)
-        .single();
-        
-      if (reportData) {
-        await supabase
-          .from('officer_report_materials')
-          .upsert({
-            report_id: reportId,
-            video_id: videoId,
-            video_url: videoUrl,
-            video_name: videoUrl.split('/').pop() || 'video.mp4',
-            video_status: 'analyzed',
-            report_title: reportData.title,
-            report_status: reportData.status,
-            user_id: reportData.user_id
-          }, {
-            onConflict: 'report_id,video_url'
-          });
+    if (videoUrl && videoId) {
+      try {
+        const { data: reportData } = await supabase
+          .from('crime_reports')
+          .select('user_id, title, status')
+          .eq('id', reportId)
+          .single();
+          
+        if (reportData) {
+          // First create an entry record that we can insert into the view
+          const { data, error } = await supabase
+            .from('report_pdfs')
+            .insert({
+              report_id: reportId,
+              file_name: `video-analysis-${videoId}.pdf`,
+              file_url: videoUrl,
+              is_official: false
+            })
+            .select('id')
+            .single();
+            
+          if (error) {
+            console.error("Error creating entry for officer materials:", error);
+          } else if (data) {
+            // The record is now created and should show up in the officer_report_materials view
+            console.log("Created entry in report_pdfs for officer access with ID:", data.id);
+          }
+        }
+      } catch (error) {
+        console.error("Error creating officer materials entry:", error);
       }
     }
   } catch (error) {

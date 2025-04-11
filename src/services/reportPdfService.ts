@@ -89,23 +89,9 @@ export const saveReportPdf = async (
         .eq('id', reportId)
         .single();
         
-      if (reportData) {
-        const { error: materialsError } = await supabase
-          .from('officer_report_materials')
-          .insert({
-            report_id: reportId,
-            pdf_id: pdfData.id,
-            pdf_name: fileName,
-            pdf_url: fileUrl,
-            pdf_is_official: isOfficial,
-            report_title: reportData.title,
-            report_status: reportData.status,
-            user_id: reportData.user_id
-          });
-          
-        if (materialsError) {
-          console.error("Error adding to officer materials:", materialsError);
-        }
+      if (reportData && pdfData) {
+        // The record will be automatically available in the view
+        console.log("PDF record will be available in officer_report_materials view");
       }
     } catch (err) {
       console.error("Error getting report data:", err);
