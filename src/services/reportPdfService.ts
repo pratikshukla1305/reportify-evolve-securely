@@ -81,7 +81,7 @@ export const saveReportPdf = async (
       throw dbError;
     }
     
-    // Also store in officer_report_materials table for officer access
+    // Record will be available in officer_report_materials view automatically
     try {
       const { data: reportData } = await supabase
         .from('crime_reports')
@@ -90,7 +90,7 @@ export const saveReportPdf = async (
         .single();
         
       if (reportData && pdfData) {
-        // The record will be automatically available in the view
+        // The record will be automatically available in the officer_report_materials view
         console.log("PDF record will be available in officer_report_materials view");
       }
     } catch (err) {

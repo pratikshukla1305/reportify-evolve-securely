@@ -1,14 +1,35 @@
 
 import React from 'react';
-import { FileText, ShieldCheck, Clock, FileSpreadsheet, FileCode } from 'lucide-react';
+import { FileText, ShieldCheck, Clock, FileSpreadsheet, FileCode, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 type ReportCardProps = {
   className?: string;
+  reportId?: string;
+  pdfUrl?: string;
+  onDownload?: () => void;
 };
 
-const ReportCard = ({ className }: ReportCardProps) => {
+const ReportCard = ({ className, reportId, pdfUrl, onDownload }: ReportCardProps) => {
+  const handleDownloadClick = () => {
+    if (onDownload) {
+      onDownload();
+    } else if (pdfUrl) {
+      // If we have a URL but no custom download handler
+      const link = document.createElement('a');
+      link.href = pdfUrl;
+      link.download = `Shield-Report-${reportId || 'download'}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success("PDF download started");
+    } else {
+      toast.error("No PDF available to download");
+    }
+  };
+  
   return (
     <div className={cn('glass-card p-6', className)}>
       <div className="mb-4 flex items-center justify-between">
@@ -68,12 +89,22 @@ const ReportCard = ({ className }: ReportCardProps) => {
         >
           Cancel
         </Button>
-        <Button 
-          to="/view-draft-report"
-          className="bg-shield-blue text-white hover:bg-blue-600 transition-all"
-        >
-          View Draft Report
-        </Button>
+        {pdfUrl ? (
+          <Button 
+            onClick={handleDownloadClick}
+            className="bg-shield-blue text-white hover:bg-blue-600 transition-all"
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Download Report
+          </Button>
+        ) : (
+          <Button 
+            to="/view-draft-report"
+            className="bg-shield-blue text-white hover:bg-blue-600 transition-all"
+          >
+            View Draft Report
+          </Button>
+        )}
       </div>
     </div>
   );

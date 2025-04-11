@@ -193,7 +193,7 @@ const mockAnalyzeVideo = async (
       console.error("Error saving mock analysis:", analysisError);
     }
     
-    // Also store in officer_report_materials if there's a video
+    // Also create a PDF entry for the officer to access this video analysis
     if (videoUrl && videoId) {
       try {
         const { data: reportData } = await supabase
