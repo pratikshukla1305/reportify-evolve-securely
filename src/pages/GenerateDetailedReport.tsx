@@ -232,14 +232,30 @@ const GenerateDetailedReport = () => {
         doc.text("No analysis data available", 20, 105);
       }
       
-      // Add watermark/stamp with transparency
-      doc.setGState(new doc.GState({ opacity: 0.2 }));
-      try {
-        doc.addImage(img, 'PNG', 60, 120, 80, 80);
-      } catch (watermarkError) {
-        console.error("Error adding watermark to PDF:", watermarkError);
+      // Add watermark/stamp with transparency - Fix for jsPDF v3
+      // Instead of using GState, use setGlobalAlpha for transparency
+      if (doc.context2d) {
+        // Save the current globalAlpha value
+        const currentAlpha = doc.context2d.globalAlpha;
+        
+        // Set transparency for watermark
+        doc.context2d.globalAlpha = 0.2;
+        try {
+          doc.addImage(img, 'PNG', 60, 120, 80, 80);
+        } catch (watermarkError) {
+          console.error("Error adding watermark to PDF:", watermarkError);
+        }
+        
+        // Restore the original globalAlpha value
+        doc.context2d.globalAlpha = currentAlpha;
+      } else {
+        // Fallback if context2d is not available
+        try {
+          doc.addImage(img, 'PNG', 60, 120, 80, 80);
+        } catch (watermarkError) {
+          console.error("Error adding watermark to PDF:", watermarkError);
+        }
       }
-      doc.setGState(new doc.GState({ opacity: 1.0 }));
       
       doc.setFontSize(8);
       doc.setTextColor(128, 128, 128);
