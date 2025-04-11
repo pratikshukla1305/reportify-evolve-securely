@@ -120,6 +120,17 @@ export const shareReportViaEmail = async (
   message: string
 ): Promise<boolean> => {
   try {
+    console.log(`Attempting to share report via email.
+    Report ID: ${reportId}
+    PDF URL: ${pdfUrl}
+    Recipient: ${recipientEmail}
+    Subject: ${subject}`);
+    
+    if (!pdfUrl || pdfUrl.trim() === '') {
+      toast.error("No PDF URL provided for email sharing");
+      return false;
+    }
+    
     const { data, error } = await supabase.functions.invoke('share-report-email', {
       body: { 
         reportId, 
@@ -139,6 +150,26 @@ export const shareReportViaEmail = async (
     if (!data.success) {
       toast.error(data.error || "Failed to send email");
       return false;
+    }
+    
+    // Record the email sharing in the database
+    try {
+      const { error: shareError } = await supabase
+        .from("report_shares")
+        .insert([
+          {
+            report_id: reportId,
+            shared_to: recipientEmail,
+            share_type: "email",
+            shared_at: new Date().toISOString()
+          }
+        ]);
+      
+      if (shareError) {
+        console.error("Error recording share:", shareError);
+      }
+    } catch (recordError) {
+      console.error("Failed to record sharing:", recordError);
     }
     
     toast.success("Report shared via email successfully");
