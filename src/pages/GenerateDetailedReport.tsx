@@ -269,38 +269,39 @@ const GenerateDetailedReport = () => {
       
       const pdfBlob = doc.output('blob');
       
-      const fileName = `Shield-Crime-Report-${reportId}.pdf`;
-      
-      if (reportId) {
-        console.log("Saving PDF to database for report:", reportId);
-        const fileUrl = await saveReportPdf(reportId, pdfBlob, fileName, false);
-        
-        if (fileUrl) {
-          console.log("PDF saved with URL:", fileUrl);
-          setPdfUrl(fileUrl);
-          
-          const objectUrl = URL.createObjectURL(pdfBlob);
-          
-          const link = document.createElement('a');
-          link.href = objectUrl;
-          link.download = fileName;
-          link.target = '_blank';
-          document.body.appendChild(link);
-          link.click();
-          
-          setTimeout(() => {
-            URL.revokeObjectURL(objectUrl);
-            document.body.removeChild(link);
-          }, 100);
-          
-          toast.success("PDF downloaded successfully");
-          return fileUrl;
-        } else {
-          throw new Error("Failed to save PDF to server");
-        }
-      } else {
+      if (!reportId) {
         console.error("Cannot save PDF: No report ID available");
         throw new Error("No report ID available");
+      }
+      
+      const fileName = `Shield-Crime-Report-${reportId}.pdf`;
+      console.log(`Generated PDF blob (${pdfBlob.size} bytes) for report ${reportId}`);
+      
+      console.log("Saving PDF to database for report:", reportId);
+      const fileUrl = await saveReportPdf(reportId, pdfBlob, fileName, false);
+      
+      if (fileUrl) {
+        console.log("PDF saved with URL:", fileUrl);
+        setPdfUrl(fileUrl);
+        
+        const objectUrl = URL.createObjectURL(pdfBlob);
+        
+        const link = document.createElement('a');
+        link.href = objectUrl;
+        link.download = fileName;
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        
+        setTimeout(() => {
+          URL.revokeObjectURL(objectUrl);
+          document.body.removeChild(link);
+        }, 100);
+        
+        toast.success("PDF downloaded successfully");
+        return fileUrl;
+      } else {
+        throw new Error("Failed to save PDF to server");
       }
     } catch (error: any) {
       console.error("Error generating PDF:", error);
@@ -310,19 +311,24 @@ const GenerateDetailedReport = () => {
   };
   
   const handleDownload = async () => {
-    if (pdfUrl) {
-      console.log("Using existing PDF URL for download:", pdfUrl);
-      const link = document.createElement('a');
-      link.href = pdfUrl;
-      link.download = `Shield-Crime-Report-${reportId}.pdf`;
-      link.target = '_blank';
-      document.body.appendChild(link);
-      link.click();
-      setTimeout(() => document.body.removeChild(link), 100);
-      toast.success("PDF download started");
-    } else {
-      console.log("No PDF URL available, generating new PDF...");
-      await generatePDF();
+    try {
+      if (pdfUrl) {
+        console.log("Using existing PDF URL for download:", pdfUrl);
+        const link = document.createElement('a');
+        link.href = pdfUrl;
+        link.download = `Shield-Crime-Report-${reportId}.pdf`;
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        setTimeout(() => document.body.removeChild(link), 100);
+        toast.success("PDF download started");
+      } else {
+        console.log("No PDF URL available, generating new PDF...");
+        await generatePDF();
+      }
+    } catch (error: any) {
+      console.error("Download error:", error);
+      toast.error(`Download failed: ${error.message || "Unknown error"}`);
     }
   };
   

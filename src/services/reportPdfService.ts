@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { v4 as uuidv4 } from 'uuid';
@@ -81,6 +82,22 @@ export const saveReportPdf = async (
     }
     
     console.log("PDF record stored in database successfully:", pdfData);
+    
+    try {
+      // Also create or update an entry in the officer_report_materials table
+      // This is a view or aggregation table for officers to see materials
+      await supabase.rpc('update_officer_report_materials', {
+        p_report_id: reportId,
+        p_pdf_id: pdfData.id,
+        p_pdf_name: fileName,
+        p_pdf_url: fileUrl,
+        p_pdf_is_official: isOfficial
+      });
+      console.log("Updated officer_report_materials successfully");
+    } catch (materialError) {
+      // Don't fail the whole operation if this fails
+      console.error("Error updating officer_report_materials:", materialError);
+    }
     
     toast.success("PDF saved successfully");
     return fileUrl;

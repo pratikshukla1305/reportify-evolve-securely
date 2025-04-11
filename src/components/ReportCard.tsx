@@ -4,6 +4,7 @@ import { FileText, ShieldCheck, Clock, FileSpreadsheet, FileCode, Download } fro
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 type ReportCardProps = {
   className?: string;
@@ -13,33 +14,98 @@ type ReportCardProps = {
 };
 
 const ReportCard = ({ className, reportId, pdfUrl, onDownload }: ReportCardProps) => {
-  const handleDownloadClick = () => {
+  const handleDownloadClick = async () => {
     if (onDownload) {
       onDownload();
       return;
-    } 
+    }
     
-    if (pdfUrl) {
-      console.log("Downloading PDF from URL:", pdfUrl);
-      // Create an invisible anchor element for the download
-      const link = document.createElement('a');
-      link.href = pdfUrl;
-      link.download = `Shield-Report-${reportId || 'download'}.pdf`;
-      // This is important to make it work on all browsers
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
-      document.body.appendChild(link);
-      link.click();
-      
-      // Remove the link from the document
-      setTimeout(() => {
-        document.body.removeChild(link);
-      }, 100);
-      
-      toast.success("PDF download started");
-    } else {
-      toast.error("No PDF available to download");
-      console.error("No PDF URL available for download");
+    try {
+      if (pdfUrl) {
+        console.log("Downloading PDF from URL:", pdfUrl);
+        
+        // Create an invisible anchor element for the download
+        const link = document.createElement('a');
+        link.href = pdfUrl;
+        link.download = `Shield-Report-${reportId || 'download'}.pdf`;
+        // This is important to make it work on all browsers
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        document.body.appendChild(link);
+        link.click();
+        
+        // Remove the link from the document
+        setTimeout(() => {
+          document.body.removeChild(link);
+        }, 100);
+        
+        // Log download if reportId exists
+        if (reportId) {
+          try {
+            const user = supabase.auth.getUser();
+            // Record the download in the database if possible
+            await supabase.from('pdf_downloads').insert({
+              report_id: reportId,
+              filename: `Shield-Report-${reportId}.pdf`,
+              success: true,
+              // We don't have officer_id here, it's a user download
+            });
+          } catch (logError) {
+            // Just log the error, but don't show to user as download already worked
+            console.error("Failed to log PDF download:", logError);
+          }
+        }
+        
+        toast.success("PDF download started");
+      } else {
+        // If no pdfUrl is provided, try to fetch the latest PDF for this report
+        if (reportId) {
+          console.log("No PDF URL provided, fetching latest PDF for report:", reportId);
+          
+          const { data: pdfs, error } = await supabase
+            .from('report_pdfs')
+            .select('*')
+            .eq('report_id', reportId)
+            .order('created_at', { ascending: false })
+            .limit(1);
+          
+          if (error) {
+            console.error("Error fetching PDF:", error);
+            throw new Error(`Failed to fetch PDF: ${error.message}`);
+          }
+          
+          if (pdfs && pdfs.length > 0) {
+            const latestPdf = pdfs[0];
+            console.log("Found PDF:", latestPdf);
+            
+            // Create and click download link
+            const link = document.createElement('a');
+            link.href = latestPdf.file_url;
+            link.download = latestPdf.file_name;
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+            document.body.appendChild(link);
+            link.click();
+            
+            // Remove the link from the document
+            setTimeout(() => {
+              document.body.removeChild(link);
+            }, 100);
+            
+            toast.success("PDF download started");
+            return;
+          } else {
+            console.error("No PDFs found for report:", reportId);
+            throw new Error("No PDF available for this report");
+          }
+        } else {
+          toast.error("No PDF available to download");
+          console.error("No PDF URL or report ID available for download");
+        }
+      }
+    } catch (error: any) {
+      toast.error(`Download failed: ${error.message || "Unknown error"}`);
+      console.error("PDF download error:", error);
     }
   };
   
