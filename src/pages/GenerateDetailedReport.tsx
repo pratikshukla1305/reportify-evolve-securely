@@ -185,7 +185,7 @@ const GenerateDetailedReport = () => {
   
   const generatePDF = async () => {
     try {
-      console.log("Starting PDF generation...");
+      console.log("Starting PDF generation process...");
       const doc = new jsPDF();
       
       try {
@@ -202,7 +202,7 @@ const GenerateDetailedReport = () => {
         console.log("Shield logo loaded successfully");
       } catch (logoError) {
         console.error("Error adding logo to PDF:", logoError);
-        toast.error("Could not add logo to PDF");
+        toast.warning("Could not add logo to PDF, continuing with generation");
       }
       
       doc.setFontSize(22);
@@ -261,6 +261,7 @@ const GenerateDetailedReport = () => {
         await applyShieldWatermark(doc, SHIELD_LOGO_URL);
       } catch (watermarkError) {
         console.error("Error adding watermark to PDF:", watermarkError);
+        toast.warning("Could not add watermark to PDF, continuing with generation");
       }
       
       doc.setFontSize(8);

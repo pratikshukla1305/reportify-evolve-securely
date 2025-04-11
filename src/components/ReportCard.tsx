@@ -23,17 +23,16 @@ const ReportCard = ({ className, reportId, pdfUrl, onDownload }: ReportCardProps
       if (pdfUrl) {
         console.log("Downloading PDF from URL:", pdfUrl);
         
-        // Create an invisible anchor element for the download
+        // Create an anchor element to trigger the download
         const link = document.createElement('a');
         link.href = pdfUrl;
         link.download = `Shield-Report-${reportId || 'download'}.pdf`;
-        // This is important to make it work on all browsers
         link.target = '_blank';
         link.rel = 'noopener noreferrer';
         document.body.appendChild(link);
         link.click();
         
-        // Remove the link from the document
+        // Clean up the DOM
         setTimeout(() => {
           document.body.removeChild(link);
         }, 100);
@@ -41,12 +40,11 @@ const ReportCard = ({ className, reportId, pdfUrl, onDownload }: ReportCardProps
         // Log download if reportId exists
         if (reportId) {
           try {
-            // Record the download in the database if possible
+            // Record the download in the database
             await supabase.from('pdf_downloads').insert({
               report_id: reportId,
               filename: `Shield-Report-${reportId}.pdf`,
-              success: true,
-              // We don't have officer_id here, it's a user download
+              success: true
             });
           } catch (logError) {
             // Just log the error, but don't show to user as download already worked
@@ -56,9 +54,9 @@ const ReportCard = ({ className, reportId, pdfUrl, onDownload }: ReportCardProps
         
         toast.success("PDF download started");
       } else {
-        // If no pdfUrl is provided, try to fetch the latest PDF for this report
+        // If no pdfUrl is provided, fetch the latest PDF for this report
         if (reportId) {
-          console.log("No PDF URL provided, fetching latest PDF for report:", reportId);
+          console.log("Fetching latest PDF for report:", reportId);
           
           const { data: pdfs, error } = await supabase
             .from('report_pdfs')
@@ -79,13 +77,13 @@ const ReportCard = ({ className, reportId, pdfUrl, onDownload }: ReportCardProps
             // Create and click download link
             const link = document.createElement('a');
             link.href = latestPdf.file_url;
-            link.download = latestPdf.file_name;
+            link.download = latestPdf.file_name || `Shield-Report-${reportId}.pdf`;
             link.target = '_blank';
             link.rel = 'noopener noreferrer';
             document.body.appendChild(link);
             link.click();
             
-            // Remove the link from the document
+            // Clean up the DOM
             setTimeout(() => {
               document.body.removeChild(link);
             }, 100);

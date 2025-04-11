@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { v4 as uuidv4 } from 'uuid';
@@ -32,7 +31,7 @@ export const saveReportPdf = async (
     const fileId = uuidv4();
     const filePath = `report_pdfs/${reportId}/${fileId}-${fileName}`;
     
-    console.log(`Attempting to upload PDF to path: ${filePath}`);
+    console.log(`Uploading PDF to path: ${filePath}`);
     
     // Upload PDF to storage
     const { data: uploadData, error: uploadError } = await supabase.storage
@@ -84,7 +83,7 @@ export const saveReportPdf = async (
     console.log("PDF record stored in database successfully:", pdfData);
     
     try {
-      // Call the edge function instead of direct RPC call
+      // Call the edge function for updating officer materials
       const { data, error } = await supabase.functions.invoke('update-officer-materials', {
         body: {
           reportId,
@@ -98,10 +97,9 @@ export const saveReportPdf = async (
       if (error) {
         console.error("Error calling update-officer-materials function:", error);
       } else {
-        console.log("Updated officer_report_materials successfully");
+        console.log("Updated officer_report_materials successfully:", data);
       }
     } catch (materialError) {
-      // Don't fail the whole operation if this fails
       console.error("Error updating officer_report_materials:", materialError);
     }
     
@@ -270,6 +268,7 @@ export const applyShieldWatermark = async (pdf: any, watermarkUrl: string): Prom
     
     await new Promise((resolve) => {
       img.onload = resolve;
+      // Handle already loaded images
       if (img.complete) resolve(null);
     });
     
@@ -309,6 +308,5 @@ export const applyShieldWatermark = async (pdf: any, watermarkUrl: string): Prom
     console.log("Watermark applied successfully to all pages");
   } catch (error) {
     console.error("Error applying watermark:", error);
-    throw error;
   }
 };

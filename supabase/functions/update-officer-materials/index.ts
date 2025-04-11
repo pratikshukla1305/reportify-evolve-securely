@@ -44,6 +44,15 @@ serve(async (req) => {
       )
     }
     
+    console.log("Received update request for report materials:", {
+      reportId,
+      pdfId,
+      pdfName,
+      videoId,
+      videoName,
+      userId
+    });
+    
     // Get report info if not provided
     let title = reportTitle;
     let status = reportStatus;
@@ -63,7 +72,15 @@ serve(async (req) => {
       }
     }
     
-    // Call the update_officer_report_materials function created in the SQL migration
+    console.log("Calling RPC function with params:", {
+      p_report_id: reportId,
+      p_pdf_id: pdfId,
+      p_pdf_name: pdfName,
+      p_pdf_url: pdfUrl,
+      p_pdf_is_official: pdfIsOfficial
+    });
+    
+    // Call the update_officer_report_materials database function
     const { data, error } = await supabase.rpc(
       'update_officer_report_materials',
       {
