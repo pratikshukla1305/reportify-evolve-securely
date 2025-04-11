@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { v4 as uuidv4 } from 'uuid';
@@ -11,6 +12,9 @@ export interface ReportPdf {
   file_size?: number;
   is_official: boolean;
 }
+
+// Use the correct shield logo path
+const SHIELD_LOGO_URL = '/lovable-uploads/594b7790-36fd-4ed7-9eb4-61a6064666af.png';
 
 /**
  * Save a PDF file to storage and record in database
@@ -252,7 +256,7 @@ export const getOfficerReportMaterials = async (reportId: string): Promise<any[]
  */
 export const applyShieldWatermark = async (pdf: any, watermarkUrl: string): Promise<void> => {
   try {
-    console.log("Starting watermark application process...");
+    console.log("Starting watermark application process with image:", watermarkUrl);
     // Create a canvas to manipulate the watermark
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
@@ -264,10 +268,15 @@ export const applyShieldWatermark = async (pdf: any, watermarkUrl: string): Prom
     
     // Load the watermark image
     const img = new Image();
+    img.crossOrigin = "Anonymous"; // To handle CORS issues
     img.src = watermarkUrl;
     
-    await new Promise((resolve) => {
+    await new Promise((resolve, reject) => {
       img.onload = resolve;
+      img.onerror = (err) => {
+        console.error("Error loading watermark image:", err);
+        reject(err);
+      };
       // Handle already loaded images
       if (img.complete) resolve(null);
     });

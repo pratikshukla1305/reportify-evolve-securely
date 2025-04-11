@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { FileText, ShieldCheck, Clock, FileSpreadsheet, FileCode, Download, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -12,6 +11,8 @@ type ReportCardProps = {
   pdfUrl?: string;
   onDownload?: () => void;
 };
+
+const SHIELD_LOGO_URL = '/lovable-uploads/594b7790-36fd-4ed7-9eb4-61a6064666af.png';
 
 const ReportCard = ({ className, reportId, pdfUrl, onDownload }: ReportCardProps) => {
   const [isDownloading, setIsDownloading] = useState(false);

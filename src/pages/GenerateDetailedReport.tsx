@@ -33,7 +33,7 @@ import * as z from 'zod';
 import jsPDF from 'jspdf';
 import { supabase } from '@/integrations/supabase/client';
 
-const SHIELD_LOGO_URL = '/logo.jpg';
+const SHIELD_LOGO_URL = '/lovable-uploads/594b7790-36fd-4ed7-9eb4-61a6064666af.png';
 
 const locationFormSchema = z.object({
   location: z.string().min(5, {
@@ -189,16 +189,20 @@ const GenerateDetailedReport = () => {
       const doc = new jsPDF();
       
       try {
-        console.log("Attempting to add logo...");
+        console.log("Attempting to add logo with path:", SHIELD_LOGO_URL);
         const logoImg = new Image();
         logoImg.src = SHIELD_LOGO_URL;
         
-        await new Promise((resolve) => {
+        await new Promise((resolve, reject) => {
           logoImg.onload = resolve;
+          logoImg.onerror = (err) => {
+            console.error("Error loading logo:", err);
+            reject(err);
+          };
           if (logoImg.complete) resolve(null);
         });
         
-        doc.addImage(logoImg.src, 'JPEG', 95, 25, 20, 20);
+        doc.addImage(logoImg.src, 'PNG', 85, 15, 40, 40);
         console.log("Shield logo loaded successfully");
       } catch (logoError) {
         console.error("Error adding logo to PDF:", logoError);
@@ -257,7 +261,7 @@ const GenerateDetailedReport = () => {
       }
       
       try {
-        console.log("Applying Shield watermark...");
+        console.log("Applying Shield watermark with path:", SHIELD_LOGO_URL);
         await applyShieldWatermark(doc, SHIELD_LOGO_URL);
       } catch (watermarkError) {
         console.error("Error adding watermark to PDF:", watermarkError);
